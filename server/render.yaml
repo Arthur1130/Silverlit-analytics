@@ -1,0 +1,48 @@
+# Blueprint Render — déploie le back-end + une base Postgres en une fois.
+# Sur render.com : New → Blueprint → pointez sur ce dépôt.
+# Render lit ce fichier et crée le service web + la base.
+
+databases:
+  - name: silverlit-db
+    plan: free
+
+services:
+  - type: web
+    name: silverlit-analytics-api
+    runtime: node
+    plan: free
+    rootDir: server
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      # Fournie automatiquement par la base ci-dessus
+      - key: DATABASE_URL
+        fromDatabase:
+          name: silverlit-db
+          property: connectionString
+      # Généré automatiquement par Render
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_EXPIRES_IN
+        value: 12h
+      # À renseigner dans le dashboard Render après le 1er déploiement du front :
+      # l'URL publique de l'app (ex : https://silverlit-analytics.vercel.app)
+      - key: FRONTEND_URL
+        sync: false
+      # Compte admin initial — à personnaliser
+      - key: SEED_ADMIN_PSEUDO
+        value: arthur1130
+      - key: SEED_ADMIN_PASSWORD
+        sync: false
+      - key: SEED_ADMIN_EMAIL
+        value: arthur1130@silverlit.fr
+      - key: SEED_ADMIN_NAME
+        value: Arthur Leroy Sahli
+      # Emails (optionnel) — si vides, l'invitation crée le lien sans envoi auto
+      - key: RESEND_API_KEY
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: INVITATION_TTL_HOURS
+        value: "120"
