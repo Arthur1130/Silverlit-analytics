@@ -9,12 +9,15 @@ import { SOURCES, DISTRIBUTEURS, findDistributeur } from '../data';
 import type { CanalLivraison } from '../data/governance';
 import { formatRelativeDate, classNames } from '../utils/format';
 
+// Type plus permissif que { size?: number } : les icônes Lucide acceptent
+// `string | number` en taille (héritage SVG), incompatible avec un typage strict
+// `number`. On laisse `unknown` pour ne pas mentir.
 const CANAL_ICONS: Record<CanalLivraison, React.ComponentType<{ size?: number; className?: string }>> = {
-  email: Mail,
-  sFTP: Server,
-  portail: Globe,
-  EDI: Cable,
-  API: Workflow,
+  email: Mail as never,
+  sFTP: Server as never,
+  portail: Globe as never,
+  EDI: Cable as never,
+  API: Workflow as never,
 };
 
 function qualityTone(score: number): 'success' | 'warn' | 'danger' {
