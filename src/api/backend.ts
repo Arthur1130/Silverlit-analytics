@@ -169,11 +169,13 @@ interface LocalInvitation extends Invitation {
 // Compte pré-configuré du mode local — utilisable tel quel sur le site déployé.
 // Le mot de passe peut être modifié ici avant déploiement.
 const SEED_CREDENTIALS: Record<string, string> = {
-  arthur1130: 'arthur1234', // Administrateur — seul compte initial
+  arthur1130: 'arthur1234',
+  pls1406: 'Fontaine28',
 };
 
 const SEED_USERS: User[] = [
   { id: 'u-arthur', pseudo: 'arthur1130', fullName: 'Arthur Leroy Sahli', email: 'arthur1130@silverlit.fr', role: 'admin', lastLogin: '2026-05-14T08:10:00Z', createdAt: '2026-01-06T09:00:00Z' },
+  { id: 'u-philippe', pseudo: 'pls1406', fullName: 'Philippe Leroy Sahli', email: 'philippe.ls@silverlit.fr', role: 'admin', lastLogin: null, createdAt: '2026-05-27T18:30:00Z' },
 ];
 
 function load<T>(key: string, fallback: T): T {
