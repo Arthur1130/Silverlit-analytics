@@ -195,9 +195,16 @@ function save<T>(key: string, value: T) {
     /* no-op */
   }
 }
+// Lit la liste d'utilisateurs, en fusionnant le localStorage (utilisateurs
+// déjà connus) avec SEED_USERS (le code, source de vérité). Permet d'ajouter
+// de nouveaux comptes via le code sans que le cache localStorage des
+// utilisateurs ne les masque.
 function getUsers(): User[] {
   const stored = load<User[]>(LK.users, []);
-  return stored.length > 0 ? stored : SEED_USERS;
+  if (stored.length === 0) return SEED_USERS;
+  const knownPseudos = new Set(stored.map((u) => u.pseudo));
+  const newSeeds = SEED_USERS.filter((u) => !knownPseudos.has(u.pseudo));
+  return [...stored, ...newSeeds];
 }
 const EMAIL_RX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const newId = (prefix: string) => `${prefix}-${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
@@ -213,7 +220,13 @@ export const localBackend: AuthBackend = {
     if (!expected || expected !== password) {
       throw new Error('Identifiants invalides');
     }
-    const account = getUsers().find((u) => u.pseudo === key) ?? SEED_USERS[0];
+    const account = getUsers().find((u) => u.pseudo === key);
+    if (!account) {
+      // Safety net : si le profil est introuvable malgré des credentials
+      // valides (cas pathologique : SEED_USERS et SEED_CREDENTIALS désynchronisés),
+      // on refuse plutôt que de logguer comme admin par défaut.
+      throw new Error('Identifiants invalides');
+    }
     const signed = { ...account, lastLogin: new Date().toISOString() };
     save(LK.user, signed);
     save(LK.users, getUsers().map((u) => (u.id === signed.id ? signed : u)));
