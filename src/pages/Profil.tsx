@@ -75,7 +75,7 @@ export function Profil() {
 
       {isAdmin && (
         <Card className="hover:border-silverlit-red/30 transition-colors">
-          <Link to="/equipe" className="flex items-center gap-3 group">
+          <Link to="/parametres" className="flex items-center gap-3 group">
             <div className="w-10 h-10 rounded-xl bg-surface-alt dark:bg-night-alt flex items-center justify-center shrink-0">
               <Users size={16} className="text-ink-muted" />
             </div>
@@ -84,7 +84,7 @@ export function Profil() {
                 Gestion de l'équipe &amp; des accès
               </p>
               <p className="text-xs text-ink-muted dark:text-night-muted mt-0.5">
-                Utilisateurs, rôles, invitations et demandes d'accès — réservé aux administrateurs.
+                Utilisateurs, rôles, invitations et demandes d'accès — accessible via Paramètres &gt; Équipe.
               </p>
             </div>
             <ArrowRight size={16} className="text-ink-muted group-hover:text-silverlit-red transition-colors shrink-0" />

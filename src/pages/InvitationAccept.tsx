@@ -3,7 +3,7 @@ import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { UserPlus, Eye, EyeOff, AlertCircle, ArrowLeft } from 'lucide-react';
 import { useAuth, ROLE_LABELS, type Role } from '../context/AuthContext';
 import { api, ApiError } from '../api/client';
-import { SilverlitLogo } from '../components/SilverlitLogo';
+import { AniziaBrand } from '../components/AniziaBrand';
 
 type State =
   | { phase: 'verifying' }
@@ -65,8 +65,8 @@ export function InvitationAccept() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-surface-alt dark:bg-night-bg p-6">
       <div className="w-full max-w-[400px]">
-        <div className="flex items-center justify-center mb-8">
-          <SilverlitLogo />
+        <div className="flex items-center justify-center mb-10">
+          <AniziaBrand variant="full" size="md" asLink={false} />
         </div>
 
         {state.phase === 'verifying' && (

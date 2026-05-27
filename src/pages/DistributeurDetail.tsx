@@ -6,7 +6,10 @@ import {
 import { ArrowLeft, Store, FileSpreadsheet } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { Card, KPICard, SectionHeader, Badge } from '../components/ui';
-import { findDistributeur, magasinsByDistributeur, VENTES, findProduit, PRODUITS, isEcommerce } from '../data';
+import {
+  findDistributeur, magasinsByDistributeur, magasinRealShare,
+  VENTES, findProduit, PRODUITS, isEcommerce,
+} from '../data';
 import { formatMoney, formatNumber } from '../utils/currency';
 import { weekShort } from '../utils/format';
 import { caByWeek, topProduits, periodWeeks } from '../utils/selectors';
@@ -16,7 +19,7 @@ const PERIOD_LABEL: Record<string, string> = {
   'S-1': 'S-1',
   '4S': '4 semaines',
   '13S': '13 semaines',
-  '52S': '52 semaines',
+  '52S': '12 mois',
   '24M': '24 mois',
 };
 
@@ -101,27 +104,30 @@ export function DistributeurDetail() {
       .sort((a, b) => b.ca - a.ca);
   }, [magasins, totals.ca, ecom]);
 
-  // "Top magasins" approximé : on répartit le CA selon une popularité aléatoire mais stable par code
+  // "Top magasins" — on alloue le CA du distributeur magasin par magasin
+  // via `magasinRealShare()`, qui tient compte du parc réel (nbMagasins).
+  // Les valeurs ici sont donc DIRECTEMENT comparables à celles affichées
+  // sur la page détail du magasin (cohérence garantie).
   const topMagasins = useMemo(() => {
-    if (ecom) return [];
+    if (ecom || !distributeur) return [];
     const totalCa = totals.ca;
     const totalQte = totals.qte;
-    const enriched = magasins.map((m, i) => {
-      const seed = (m.code.charCodeAt(0) + m.code.charCodeAt(2) + i * 7) % 100;
-      const weight = 0.5 + (seed / 100) * 1.5;
-      return { ...m, weight };
-    });
-    const totalWeight = enriched.reduce((s, e) => s + e.weight, 0);
-    return enriched
-      .map((m) => ({
-        ...m,
-        ca: (totalCa * m.weight) / totalWeight,
-        qte: Math.round((totalQte * m.weight) / totalWeight),
-        rupture: Math.round((m.weight * 17) % 25), // % rupture estimé
-      }))
+    return magasins
+      .map((m) => {
+        const share = magasinRealShare(m, distributeur);
+        // % de rupture déterministe diversifié (cohérent avec MagasinDetail)
+        const ruptSeed = (m.code.charCodeAt(0)
+          + m.code.charCodeAt(m.code.length - 1) * 7) % 100;
+        return {
+          ...m,
+          ca: totalCa * share,
+          qte: Math.round(totalQte * share),
+          rupture: Math.round((ruptSeed / 100) * 22),
+        };
+      })
       .sort((a, b) => b.ca - a.ca)
       .slice(0, 8);
-  }, [magasins, totals, ecom]);
+  }, [magasins, totals, ecom, distributeur]);
 
   if (!distributeur) {
     return (
@@ -265,20 +271,32 @@ export function DistributeurDetail() {
 
         {!ecom ? (
           <Card>
-            <SectionHeader title="Top magasins" subtitle="Performances estimées par point de vente" />
-            <ul className="space-y-2.5">
+            <SectionHeader
+              title="Top magasins"
+              subtitle="Cliquez sur un magasin pour voir son détail"
+            />
+            <ul className="space-y-1">
               {topMagasins.map((m) => (
-                <li key={m.code} className="flex items-center justify-between gap-3 text-sm">
-                  <div className="min-w-0 flex-1">
-                    <p className="text-[13px] text-ink dark:text-night-ink truncate">{m.libelle}</p>
-                    <p className="text-2xs text-ink-muted">{m.ville} · {m.region}</p>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <p className="text-[13px] tabular text-ink dark:text-night-ink">
-                      {formatMoney(m.ca, devise, { compact: true })}
-                    </p>
-                    <p className="text-2xs tabular text-ink-muted">{formatNumber(m.qte)} u. · {m.rupture}% rupture</p>
-                  </div>
+                <li key={m.code}>
+                  <Link
+                    to={`/distributeurs/${distributeur.id}/magasins/${m.code}`}
+                    className="flex items-center justify-between gap-3 py-1.5 px-1 rounded hover:bg-surface-alt dark:hover:bg-night-alt group"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <p className="text-[13px] text-ink dark:text-night-ink truncate group-hover:underline">
+                        {m.libelle}
+                      </p>
+                      <p className="text-2xs text-ink-muted">{m.ville} · {m.region}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-[13px] tabular text-ink dark:text-night-ink">
+                        {formatMoney(m.ca, devise, { compact: true })}
+                      </p>
+                      <p className="text-2xs tabular text-ink-muted">
+                        {formatNumber(m.qte)} u. · {m.rupture}% rupture
+                      </p>
+                    </div>
+                  </Link>
                 </li>
               ))}
             </ul>

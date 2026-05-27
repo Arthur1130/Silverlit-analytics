@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
   UploadCloud, FileSpreadsheet, CheckCircle2, Sparkles, ArrowRight, ChevronDown,
@@ -7,6 +7,7 @@ import {
 import { Card, SectionHeader, Badge, ProgressBar } from '../components/ui';
 import { classNames } from '../utils/format';
 import { IMPORT_FORMATS, TARGET_FIELDS, type ImportFormat } from '../data';
+import { validateImport } from '../utils/importValidation';
 
 type Step = 'drop' | 'analyzing' | 'mapping' | 'preview' | 'done';
 
@@ -55,6 +56,14 @@ export function Import() {
   const mappedCount = fmt
     ? Object.values(mapping).filter(Boolean).length + compositeKeys.length
     : 0;
+
+  // Validation minimale : repère les cellules vides dans les colonnes
+  // critiques (EAN, qté, année, semaine). Recalculé à chaque changement
+  // de mapping pour rester réactif.
+  const validation = useMemo(() => {
+    if (!fmt) return null;
+    return validateImport(fmt, mapping);
+  }, [fmt, mapping]);
 
   return (
     <div className="max-w-[1320px] mx-auto">
@@ -334,6 +343,89 @@ export function Import() {
           <ProgressBar value={progress} />
           <p className="text-2xs text-ink-muted mt-2 tabular">{Math.round(progress)}%</p>
         </Card>
+      )}
+
+      {/* --- ALERTES DE VALIDATION (visibles dès l'étape mapping) --- */}
+      {fmt && validation && (step === 'mapping' || step === 'preview') && (
+        validation.hasIssues ? (
+          <Card className="mb-4 border-brand-orange/40 bg-brand-orange/5">
+            <div className="flex items-start gap-3">
+              <AlertTriangle size={18} className="text-brand-orange shrink-0 mt-0.5" />
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="text-[13px] font-medium tracking-tightish text-ink dark:text-night-ink">
+                    Données manquantes détectées
+                  </h3>
+                  <Badge tone="warn">
+                    {validation.totalMissingCells + validation.unmappedRequiredFields.length} signalement(s)
+                  </Badge>
+                </div>
+                <p className="text-xs text-ink-muted mb-3">
+                  L'import peut se poursuivre, mais les lignes incomplètes seront ignorées par les analyses.
+                </p>
+
+                {validation.unmappedRequiredFields.length > 0 && (
+                  <div className="mb-3 p-3 rounded-lg bg-white dark:bg-night-surface border border-hair hairline">
+                    <p className="text-2xs uppercase tracking-wider text-ink-muted mb-1.5">
+                      Champs obligatoires sans colonne mappée
+                    </p>
+                    <ul className="space-y-1">
+                      {validation.unmappedRequiredFields.map((f) => (
+                        <li key={f} className="text-xs text-ink dark:text-night-ink flex items-center gap-2">
+                          <span className="text-brand-orange">●</span>
+                          <strong>{f}</strong>
+                          <span className="text-ink-muted">— aucune colonne source ne l'alimente</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {validation.issues.length > 0 && (
+                  <div className="p-3 rounded-lg bg-white dark:bg-night-surface border border-hair hairline">
+                    <p className="text-2xs uppercase tracking-wider text-ink-muted mb-1.5">
+                      Cellules vides dans l'échantillon (10 premières lignes)
+                    </p>
+                    <ul className="space-y-1">
+                      {validation.issues.map((iss) => (
+                        <li key={iss.field} className="text-xs text-ink dark:text-night-ink flex items-start gap-2">
+                          <span className="text-brand-orange mt-0.5">●</span>
+                          <span>
+                            <strong>{iss.fieldLabel}</strong>
+                            {iss.sourceColumn && (
+                              <span className="text-ink-muted"> (colonne <code className="px-1 py-0.5 bg-surface-alt dark:bg-night-alt rounded text-2xs">{iss.sourceColumn}</code>)</span>
+                            )}
+                            {' : '}
+                            <span className="tabular">{iss.missingRows.length}</span> cellule{iss.missingRows.length > 1 ? 's' : ''} vide{iss.missingRows.length > 1 ? 's' : ''}
+                            {' '}
+                            <span className="text-ink-muted">
+                              — ligne{iss.missingRows.length > 1 ? 's' : ''} {iss.missingRows.slice(0, 5).join(', ')}
+                              {iss.missingRows.length > 5 && ` …+${iss.missingRows.length - 5}`}
+                            </span>
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            </div>
+          </Card>
+        ) : (
+          <Card className="mb-4 border-brand-green/40 bg-brand-green/5">
+            <div className="flex items-center gap-3">
+              <CheckCircle2 size={18} className="text-brand-green shrink-0" />
+              <div>
+                <p className="text-[13px] font-medium tracking-tightish text-ink dark:text-night-ink">
+                  Fichier complet
+                </p>
+                <p className="text-xs text-ink-muted">
+                  Aucune donnée manquante détectée sur les colonnes critiques (EAN, quantité, période).
+                </p>
+              </div>
+            </div>
+          </Card>
+        )
       )}
 
       {/* --- ÉTAPE 3 : MAPPING --- */}

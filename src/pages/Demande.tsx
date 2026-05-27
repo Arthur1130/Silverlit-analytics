@@ -2,7 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { Link } from 'react-router-dom';
 import { CheckCircle2, ArrowLeft } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { SilverlitLogo } from '../components/SilverlitLogo';
+import { AniziaBrand } from '../components/AniziaBrand';
 
 export function Demande() {
   const { submitDemande } = useAuth();
@@ -29,8 +29,8 @@ export function Demande() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-surface-alt dark:bg-night-bg p-6">
       <div className="w-full max-w-[460px]">
-        <div className="flex items-center justify-center mb-6">
-          <SilverlitLogo />
+        <div className="flex items-center justify-center mb-8">
+          <AniziaBrand variant="full" size="md" asLink={false} />
         </div>
 
         {sent ? (

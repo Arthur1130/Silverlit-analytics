@@ -80,10 +80,12 @@ export const IMPORT_FORMATS: ImportFormat[] = [
     preview: [
       ['2026-19', '38406', 'SILVERLIT', '02F0', '02F0 / JC FAYET', 'JouéClub', '02023432', 'STUNT DRONE', '54077', '4891813540007', '', '', '', '23', '3'],
       ['2026-19', '38406', 'SILVERLIT', '05G2', '05G2 / JC GAP', 'JouéClub', '02018440', 'POKIBOT VIOLET', '88800', '4891813888008', '', '', '', '12', '1'],
-      ['2026-19', '38406', 'SILVERLIT', '06AN', '06AN / JC ANNECY', 'JouéClub', '02022210', 'MEGA BOT', '21253', '4891813212539', '', '', '', '8', '2'],
+      // Ligne 4 : EAN vide → doit déclencher l'alerte
+      ['2026-19', '38406', 'SILVERLIT', '06AN', '06AN / JC ANNECY', 'JouéClub', '02022210', 'MEGA BOT', '21253', '', '', '', '', '8', '2'],
       ['2026-19', '38406', 'SILVERLIT', '13A1', '13A1 / JC AIX', 'JouéClub', '02023432', 'STUNT DRONE', '54077', '4891813540007', '', '', '', '17', '0'],
       ['2026-19', '38406', 'SILVERLIT', '14CA', '14CA / JC CAEN', 'JouéClub', '02024510', 'TORNADO AMAZONE', '84150', '4891813841500', '', '', '', '6', '1'],
-      ['2026-19', '38406', 'SILVERLIT', '21D1', '21D1 / JC DIJON', 'JouéClub', '02023432', 'ALIEN VISION', '88750', '4891813887506', '', '', '', '11', '4'],
+      // Ligne 7 : quantité vendue vide → alerte
+      ['2026-19', '38406', 'SILVERLIT', '21D1', '21D1 / JC DIJON', 'JouéClub', '02023432', 'ALIEN VISION', '88750', '4891813887506', '', '', '', '', '4'],
     ],
   },
   {

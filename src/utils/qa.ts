@@ -211,7 +211,7 @@ function extractPeriod(q: string): PeriodFilter {
     return { label: '6 mois glissants', weeks: WEEKS.slice(-26) };
   }
   if (/\banne[er]|52\s*sem|12\s*mois|annuel|un\s+an\b/.test(q)) {
-    return { label: '52 semaines glissantes', weeks: WEEKS.slice(-52) };
+    return { label: '12 mois glissants', weeks: WEEKS.slice(-52) };
   }
   if (/\b24\s*mois|2\s*ans|deux\s+ans|historique\b/.test(q)) {
     return { label: '24 mois', weeks: WEEKS };

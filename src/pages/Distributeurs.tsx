@@ -223,7 +223,14 @@ export function Distributeurs() {
                 const d = DISTRIBUTEURS.find((dd) => dd.id === m.distributeurId)!;
                 return (
                   <tr key={m.code} className="border-b border-hair hairline last:border-b-0 hover:bg-surface-alt dark:hover:bg-night-alt">
-                    <td className="px-4 py-2 text-[13px] text-ink dark:text-night-ink tabular">{m.code} · {m.libelle}</td>
+                    <td className="px-4 py-2 text-[13px] tabular">
+                      <Link
+                        to={`/distributeurs/${d.id}/magasins/${m.code}`}
+                        className="text-ink dark:text-night-ink hover:underline"
+                      >
+                        {m.code} · {m.libelle}
+                      </Link>
+                    </td>
                     <td className="px-4 py-2 text-[13px] text-ink-muted">{m.ville}</td>
                     <td className="px-4 py-2 text-2xs text-ink-muted">{m.region}</td>
                     <td className="px-4 py-2">

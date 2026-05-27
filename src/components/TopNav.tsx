@@ -2,15 +2,17 @@ import { useEffect, useRef, useState } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import {
   LayoutGrid, Package, Store, Bell, Image as ImageIcon, Upload, ShieldCheck,
-  Users, Search, Moon, Sun, LogOut, User as UserIcon, Menu, X,
+  Search, Moon, Sun, LogOut, User as UserIcon, Menu, X, Settings,
 } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { useAuth, initialsOf } from '../context/AuthContext';
 import { classNames } from '../utils/format';
 import { CommandPalette } from './CommandPalette';
-import { SilverlitLogo } from './SilverlitLogo';
-import { AniziaLogo } from './AniziaLogo';
+import { AniziaBrand } from './AniziaBrand';
 
+// Équipe et Paramètres sont accessibles via le menu utilisateur (icône
+// profil en haut à droite), pas dans la nav horizontale : ce sont des
+// réglages, pas des écrans de travail quotidiens.
 const NAV = [
   { to: '/pilotage', label: 'Pilotage', icon: LayoutGrid, adminOnly: false },
   { to: '/produits', label: 'Produits', icon: Package, adminOnly: false },
@@ -19,7 +21,6 @@ const NAV = [
   { to: '/infographie', label: 'Infographie', icon: ImageIcon, adminOnly: false },
   { to: '/import', label: 'Import', icon: Upload, adminOnly: false },
   { to: '/gouvernance', label: 'Gouvernance', icon: ShieldCheck, adminOnly: false },
-  { to: '/equipe', label: 'Équipe', icon: Users, adminOnly: true },
 ];
 
 export function TopNav() {
@@ -51,20 +52,8 @@ export function TopNav() {
     <>
       <header className="sticky top-0 z-30 bg-white/85 dark:bg-night-bg/85 backdrop-blur-xl border-b border-hair hairline">
         <div className="h-14 px-4 sm:px-6 flex items-center gap-4 max-w-[1320px] mx-auto">
-          {/* Logo Silverlit — marque du client */}
-          <button
-            onClick={() => navigate('/pilotage')}
-            className="shrink-0"
-            aria-label="Accueil"
-          >
-            <SilverlitLogo />
-          </button>
-
-          {/* Signature cabinet — discrète, séparée du logo client par une hairline */}
-          <div className="hidden lg:flex items-center gap-3 shrink-0">
-            <span className="h-3.5 w-px bg-surface-line dark:bg-night-line" />
-            <AniziaLogo />
-          </div>
+          {/* Logo ANIZIA — cliquable, retour à l'accueil */}
+          <AniziaBrand size="md" />
 
           {/* Hamburger mobile */}
           <button
@@ -243,6 +232,17 @@ function UserMenu() {
             <UserIcon size={13} className="text-ink-muted" />
             Mon profil
           </button>
+          <button
+            onClick={() => {
+              navigate('/parametres');
+              setOpen(false);
+            }}
+            className="w-full px-3 py-2 flex items-center gap-2 text-xs text-ink dark:text-night-ink hover:bg-surface-alt dark:hover:bg-night-alt transition-colors"
+          >
+            <Settings size={13} className="text-ink-muted" />
+            Paramètres
+          </button>
+          <div className="border-t border-hair hairline my-1" />
           <button
             onClick={() => {
               signOut();

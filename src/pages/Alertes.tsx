@@ -222,12 +222,22 @@ export function Alertes() {
                     <div className={classNames('mt-1 shrink-0 w-2 h-2 rounded-full', dotColor(a.severite))} />
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <Link
-                          to={`/produits/${a.ean}`}
-                          className="text-[14px] font-medium tracking-tightish text-ink dark:text-night-ink hover:underline"
-                        >
-                          {a.libelle}
-                        </Link>
+                        {findProduit(a.ean) ? (
+                          <Link
+                            to={`/produits/${a.ean}`}
+                            className="text-[14px] font-medium tracking-tightish text-ink dark:text-night-ink hover:underline"
+                          >
+                            {a.libelle}
+                          </Link>
+                        ) : (
+                          // EAN inconnu du catalogue : on n'expose pas un lien cassé
+                          <span
+                            className="text-[14px] font-medium tracking-tightish text-ink dark:text-night-ink"
+                            title="Produit non trouvé dans le catalogue actuel"
+                          >
+                            {a.libelle}
+                          </span>
+                        )}
                         <Badge tone={typeTone(a.type)}>{a.type}</Badge>
                         <Badge>{a.severite}</Badge>
                         {d && (

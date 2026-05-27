@@ -4,17 +4,17 @@ import { PRODUITS } from './products';
 // Référentiel des 11 distributeurs réels Silverlit France (source : organisation
 // des dossiers "STATS 2026" reçus chaque semaine par enseigne)
 export const DISTRIBUTEURS: Distributeur[] = [
-  { id: 'joueclub', nom: 'JouéClub', type: 'GSS', nbMagasins: 239, logoColor: '#e63946' },
-  { id: 'recreaclub', nom: 'Récréa Club / La Grande Récré', type: 'GSS', nbMagasins: 180, logoColor: '#ff6b35' },
-  { id: 'kingjouet', nom: 'King Jouet', type: 'GSS', nbMagasins: 220, logoColor: '#ffb703' },
-  { id: 'oxybul', nom: 'Oxybul', type: 'GSS', nbMagasins: 95, logoColor: '#7209b7' },
-  { id: 'fnacdarty', nom: 'Fnac Darty', type: 'GSS', nbMagasins: 320, logoColor: '#f0a500' },
-  { id: 'smythstoys', nom: 'Smyths Toys', type: 'GSS', nbMagasins: 28, logoColor: '#d62828' },
-  { id: 'galec', nom: 'GALEC / E.Leclerc', type: 'GMS', nbMagasins: 720, logoColor: '#0353a4' },
-  { id: 'carrefour', nom: 'Carrefour', type: 'GMS', nbMagasins: 1054, logoColor: '#005baa' },
-  { id: 'auchan', nom: 'Auchan', type: 'GMS', nbMagasins: 645, logoColor: '#ef3340' },
-  { id: 'amazon', nom: 'Amazon', type: 'ecommerce', nbMagasins: 1, logoColor: '#ff9900' },
-  { id: 'cdiscount', nom: 'Cdiscount', type: 'ecommerce', nbMagasins: 1, logoColor: '#ee7600' },
+  { id: 'joueclub', nom: 'JouéClub', codeRetail: 'JC', type: 'GSS', nbMagasins: 239, logoColor: '#e63946' },
+  { id: 'recreaclub', nom: 'Récréa Club / La Grande Récré', codeRetail: 'LGR', type: 'GSS', nbMagasins: 180, logoColor: '#ff6b35' },
+  { id: 'kingjouet', nom: 'King Jouet', codeRetail: 'KJ', type: 'GSS', nbMagasins: 220, logoColor: '#ffb703' },
+  { id: 'oxybul', nom: 'Oxybul', codeRetail: 'OX', type: 'GSS', nbMagasins: 95, logoColor: '#7209b7' },
+  { id: 'fnacdarty', nom: 'Fnac Darty', codeRetail: 'FNAC', type: 'GSS', nbMagasins: 320, logoColor: '#f0a500' },
+  { id: 'smythstoys', nom: 'Smyths Toys', codeRetail: 'SMYTHS', type: 'GSS', nbMagasins: 28, logoColor: '#d62828' },
+  { id: 'galec', nom: 'GALEC / E.Leclerc', codeRetail: 'LEC', type: 'GMS', nbMagasins: 720, logoColor: '#0353a4' },
+  { id: 'carrefour', nom: 'Carrefour', codeRetail: 'CRF', type: 'GMS', nbMagasins: 1054, logoColor: '#005baa' },
+  { id: 'auchan', nom: 'Auchan', codeRetail: 'AUC', type: 'GMS', nbMagasins: 645, logoColor: '#ef3340' },
+  { id: 'amazon', nom: 'Amazon', codeRetail: 'AMZ', type: 'ecommerce', nbMagasins: 1, logoColor: '#ff9900' },
+  { id: 'cdiscount', nom: 'Cdiscount', codeRetail: 'CDS', type: 'ecommerce', nbMagasins: 1, logoColor: '#ee7600' },
 ];
 
 export const findDistributeur = (id: string) => DISTRIBUTEURS.find((d) => d.id === id);
@@ -127,7 +127,7 @@ function genMagasins(): Magasin[] {
   for (const d of DISTRIBUTEURS) {
     if (isEcommerce(d)) {
       out.push({
-        code: d.id.slice(0, 2).toUpperCase() + '-WEB',
+        code: `${d.codeRetail}-WEB`,
         libelle: `${d.nom} · plateforme nationale`,
         distributeurId: d.id,
         ville: 'France entière',
@@ -145,7 +145,9 @@ function genMagasins(): Magasin[] {
       .sort((a, b) => a.k - b.k)
       .slice(0, count)
       .map((x) => x.v);
-    const prefix = d.nom.split(/[\s/]/)[0].slice(0, 2).toUpperCase();
+    // Préfixe = code retail réel saisi dans DISTRIBUTEURS (JC, KJ, LGR…)
+    // Plus de découpage hasardeux du nom de l'enseigne.
+    const prefix = d.codeRetail;
     for (const v of villesShuffled) {
       i += 1;
       out.push({
@@ -166,6 +168,68 @@ export const MAGASINS: Magasin[] = genMagasins();
 
 export const magasinsByDistributeur = (id: string) =>
   MAGASINS.filter((m) => m.distributeurId === id);
+
+/** Lookup d'un magasin par son code (ex : "JC042"). */
+export const findMagasin = (code: string) =>
+  MAGASINS.find((m) => m.code === code);
+
+// =======================================================================
+//   Pondération magasin → réseau
+// =======================================================================
+//
+// On ne génère qu'un échantillon de magasins (8-24 par enseigne) alors que
+// les enseignes en ont jusqu'à 1 054 réels (Carrefour). Pour que les
+// chiffres affichés par magasin soient plausibles, il faut deux mécaniques :
+//
+//   1. Une `weight` propre à chaque magasin (variance autour de la moyenne)
+//      → pour qu'un magasin de centre-ville pèse plus qu'une petite ville.
+//      Hash FNV-1a sur le code complet : déterministe ET diversifiant
+//      (l'ancienne formule `charCodeAt(0)+charCodeAt(2)` était dégénérée
+//      pour les codes uniformes type JC001/JC002/…).
+//
+//   2. Une `realShare` qui normalise au parc RÉEL de l'enseigne.
+//      Un magasin "moyen" pèse 1/nbMagasins du CA enseigne ; un magasin
+//      au poids relatif 1.5 pèse 1.5 × (1/nbMagasins).
+//      → évite que JC NICE (1 magasin sur 11 échantillonnés) soit affiché
+//        comme 12% du CA JouéClub alors qu'en réalité il est 1/239 = 0.4%.
+
+function fnv1a(s: string): number {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < s.length; i++) {
+    h ^= s.charCodeAt(i);
+    h = Math.imul(h, 16777619) >>> 0;
+  }
+  return h;
+}
+
+/** Poids relatif d'un magasin autour de la moyenne (0.5x à 2x). */
+export function magasinRelativeWeight(code: string, indexInDist: number): number {
+  const seed = ((fnv1a(code) ^ (indexInDist * 17)) >>> 0) % 100;
+  return 0.5 + (seed / 100) * 1.5;
+}
+
+/**
+ * Part RÉELLE de ce magasin dans le CA total du distributeur, ajustée au
+ * parc réel (nbMagasins). Permet d'afficher des chiffres par magasin
+ * comparables à la réalité même si l'app n'a qu'un échantillon.
+ */
+export function magasinRealShare(magasin: Magasin, distributeur: Distributeur): number {
+  if (distributeur.nbMagasins <= 0) return 0;
+  if (isEcommerce(distributeur)) return 1; // une seule plateforme = 100%
+  const sampled = magasinsByDistributeur(distributeur.id);
+  const idx = sampled.findIndex((m) => m.code === magasin.code);
+  if (idx < 0) return 0;
+  // poids relatif de ce magasin
+  const relW = magasinRelativeWeight(magasin.code, idx);
+  // poids moyen de l'échantillon
+  const meanW = sampled.reduce(
+    (s, m, i) => s + magasinRelativeWeight(m.code, i),
+    0,
+  ) / Math.max(1, sampled.length);
+  // facteur ≥ 0 autour de la moyenne, ramené sur le parc réel
+  const factor = relW / meanW;
+  return factor / distributeur.nbMagasins;
+}
 
 // Parc total réel (somme des nbMagasins, hors plateformes e-commerce)
 export const TOTAL_POINTS_VENTE = DISTRIBUTEURS

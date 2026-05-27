@@ -4,9 +4,34 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#ffffff" />
-    <link rel="icon" type="image/png" href="/silverlit-logo.png" />
-    <link rel="apple-touch-icon" href="/silverlit-logo.png" />
-    <title>Silverlit Analytics</title>
+
+    <!-- Favicons : on utilise le logo ANIZIA (à déposer dans /public).
+         Si `anizia-icon.png` est absent, on retombe sur `anizia-logo.png`. -->
+    <link rel="icon" type="image/png" sizes="32x32" href="/anizia-icon.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="/anizia-icon.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/anizia-icon.png" />
+    <link rel="alternate icon" type="image/png" href="/anizia-logo.png" />
+
+    <!-- Identité de la page -->
+    <title>ANIZIA · Pilotage Silverlit France</title>
+    <meta
+      name="description"
+      content="Plateforme ANIZIA — pilotage des ventes Silverlit France : sell-out consolidé sur les 11 distributeurs partenaires, alertes et infographies hebdomadaires."
+    />
+    <meta name="author" content="ANIZIA" />
+
+    <!-- Open Graph : aperçus propres quand on partage le lien (Slack, Teams, mail) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="ANIZIA · Pilotage Silverlit France" />
+    <meta
+      property="og:description"
+      content="Centralisation des ventes Silverlit chez ses 11 distributeurs — par ANIZIA."
+    />
+    <meta property="og:image" content="/anizia-logo.png" />
+    <meta property="og:locale" content="fr_FR" />
+
+    <!-- Préchargement de la police système Inter via CSS pour cohérence
+         typographique du wordmark (à activer si on importe Inter). -->
   </head>
   <body>
     <div id="root"></div>

@@ -74,8 +74,16 @@ function produitWeight(index: number, statut: string): number {
   return base;
 }
 
-// Cible CA hebdo moyen en EUR HT
+// Cible CA hebdo moyen en EUR TTC consommateur
 const CA_HEBDO_BASE = 130_000; // moyenne ~ saisonnalité × 130k = 95k à 180k
+
+// Conversion prix fournisseur HT → prix consommateur TTC.
+// `prixConseille` dans le catalogue est le tarif fournisseur HT (prix d'achat
+// par le distributeur). Pour estimer une quantité consommateur réaliste, on
+// applique la TVA (20% jouet) et une marge retail moyenne (≈35% en GSS,
+// 40-45% en e-commerce, 25-30% en hyper). On retient une marge moyenne
+// pondérée du mix Silverlit : ≈35%.
+const PRIX_CONSO_FACTOR = 1.62; // = 1.20 (TVA) × 1.35 (marge retail)
 
 // Génère un dataset agrégé par (ean, distributeur, annee, semaine).
 // IMPORTANT : chaque distributeur ne vend QUE les produits de son assortiment
@@ -119,8 +127,12 @@ export function generateVentes(): Vente[] {
         const caEAN = caDistribSemaine * w_prod * productNoise;
         if (caEAN < 1) continue;
 
-        const qte = Math.max(1, Math.round(caEAN / p.prixConseille));
-        const stock = Math.round(qte * (2 + rand() * 8)); // 2x à 10x les ventes
+        // Prix consommateur estimé (TTC × marge retail)
+        const prixConso = p.prixConseille * PRIX_CONSO_FACTOR;
+        const qte = Math.max(1, Math.round(caEAN / prixConso));
+        // Stock = snapshot ponctuel à la fin de la semaine.
+        // 2x à 6x les ventes hebdo (= 2 à 6 semaines de couverture)
+        const stock = Math.round(qte * (2 + rand() * 4));
 
         ventes.push({
           ean: p.ean,

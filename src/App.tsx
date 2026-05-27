@@ -8,6 +8,7 @@ import { Produits } from './pages/Produits';
 import { ProduitDetail } from './pages/ProduitDetail';
 import { Distributeurs } from './pages/Distributeurs';
 import { DistributeurDetail } from './pages/DistributeurDetail';
+import { MagasinDetail } from './pages/MagasinDetail';
 import { Import } from './pages/Import';
 import { Alertes } from './pages/Alertes';
 import { Gouvernance } from './pages/Gouvernance';
@@ -17,6 +18,7 @@ import { Demande } from './pages/Demande';
 import { InvitationAccept } from './pages/InvitationAccept';
 import { Profil } from './pages/Profil';
 import { Equipe } from './pages/Equipe';
+import { Parametres } from './pages/Parametres';
 
 function App() {
   return (
@@ -41,11 +43,13 @@ function App() {
               <Route path="/produits/:ean" element={<ProduitDetail />} />
               <Route path="/distributeurs" element={<Distributeurs />} />
               <Route path="/distributeurs/:id" element={<DistributeurDetail />} />
+              <Route path="/distributeurs/:distId/magasins/:code" element={<MagasinDetail />} />
               <Route path="/import" element={<Import />} />
               <Route path="/alertes" element={<Alertes />} />
               <Route path="/gouvernance" element={<Gouvernance />} />
               <Route path="/infographie" element={<Infographie />} />
               <Route path="/equipe" element={<Equipe />} />
+              <Route path="/parametres" element={<Parametres />} />
               <Route path="/profil" element={<Profil />} />
               <Route path="*" element={<Navigate to="/pilotage" replace />} />
             </Route>

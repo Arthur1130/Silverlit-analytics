@@ -3,7 +3,7 @@ import { useLocation } from 'react-router-dom';
 import { ChevronDown, Check, SlidersHorizontal } from 'lucide-react';
 import { useApp, type Period } from '../context/AppContext';
 import type { Devise, Gamme } from '../types';
-import { DEVISES, DEVISE_LIST } from '../utils/currency';
+import { DEVISE_LIST, getExchangeRate } from '../utils/currency';
 import { DISTRIBUTEURS } from '../data';
 import { classNames } from '../utils/format';
 import { filtersForPath, hasAnyFilter } from '../utils/pageConfig';
@@ -12,7 +12,7 @@ const PERIODS: Array<{ value: Period; label: string }> = [
   { value: 'S-1', label: 'Semaine S-1' },
   { value: '4S', label: '4 semaines' },
   { value: '13S', label: '13 semaines' },
-  { value: '52S', label: '52 semaines' },
+  { value: '52S', label: '12 mois' },
   { value: '24M', label: '24 mois' },
 ];
 
@@ -101,7 +101,7 @@ function Dropdown<T extends string>({ value, options, onChange, align = 'left', 
 }
 
 export function FilterBar() {
-  const { devise, setDevise, filters, setFilters } = useApp();
+  const { devise, setDevise, filters, setFilters, exchangeRates } = useApp();
   const loc = useLocation();
   const cfg = filtersForPath(loc.pathname);
 
@@ -118,9 +118,13 @@ export function FilterBar() {
       DEVISE_LIST.map((d) => ({
         value: d.code,
         label: `${d.symbol} ${d.code}`,
-        hint: d.code !== 'EUR' ? `1 € = ${d.rate} ${d.code}` : undefined,
+        hint: d.code !== 'EUR'
+          ? `1 € = ${getExchangeRate(d.code).toLocaleString('fr-FR', { maximumFractionDigits: 4 })} ${d.code}`
+          : undefined,
       })),
-    [],
+    // Recalculé quand les taux changent (édités dans Paramètres)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [exchangeRates],
   );
 
   if (!hasAnyFilter(cfg)) return null;
@@ -183,9 +187,9 @@ export function FilterBar() {
             Réinitialiser
           </button>
         )}
-        {cfg.devise && (
+        {cfg.devise && devise !== 'EUR' && (
           <span className="ml-auto text-2xs text-ink-muted dark:text-night-muted tabular">
-            1 € = {DEVISES[devise].rate} {devise}
+            1 € = {getExchangeRate(devise).toLocaleString('fr-FR', { maximumFractionDigits: 4 })} {devise}
           </span>
         )}
       </div>

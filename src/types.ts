@@ -41,6 +41,10 @@ export interface Distributeur {
   nbMagasins: number;
   region?: string;
   logoColor: string;
+  // Code retail utilisé en interne (ex : "JC" pour JouéClub, "KJ" pour King Jouet).
+  // Sert de préfixe aux codes magasin (`JC001`, `KJ045`…) et de libellé court
+  // dans les exports/affichages. Source : conventions Silverlit France.
+  codeRetail: string;
 }
 
 export interface Magasin {
@@ -87,8 +91,11 @@ export type Devise = 'EUR' | 'USD' | 'GBP' | 'JPY' | 'CNY';
 export interface DeviseInfo {
   code: Devise;
   symbol: string;
-  rate: number;
   label: string;
+  // Taux par défaut (valeur de référence, non éditée par l'utilisateur).
+  // Les taux actifs sont gérés en module-scope dans `utils/currency.ts`
+  // pour permettre la mise à jour annuelle par l'admin.
+  defaultRate: number;
 }
 
 export interface SerieHebdo {

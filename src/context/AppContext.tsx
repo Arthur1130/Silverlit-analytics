@@ -1,6 +1,9 @@
 import { createContext, useContext, useMemo, useState, useEffect, type ReactNode } from 'react';
 import type { Alerte, Devise, Gamme } from '../types';
 import { ALERTES_INIT } from '../data/alerts';
+import {
+  DEFAULT_EXCHANGE_RATES, setExchangeRate as moduleSetRate, setAllExchangeRates,
+} from '../utils/currency';
 
 export type Period =
   | 'S-1'
@@ -29,6 +32,10 @@ interface AppContextValue {
   markAlerteTraitee: (id: string) => void;       // masquer (→ historique)
   markAllAlertesTraitees: (ids: string[]) => void;
   reopenAlerte: (id: string) => void;            // démasquer (→ en cours)
+  // Taux de change actifs (EUR pivot, valeurs en "1 EUR = X devise")
+  exchangeRates: Record<Devise, number>;
+  setExchangeRate: (d: Devise, rate: number) => void;
+  resetExchangeRates: () => void;
 }
 
 const Ctx = createContext<AppContextValue | null>(null);
@@ -38,6 +45,19 @@ const STORAGE_KEY = 'silverlit-analytics-prefs';
 // Stockage minimal et borné par nature : le contenu des alertes vit dans le
 // code, jamais dupliqué en localStorage.
 const ALERTES_STATUT_KEY = 'silverlit-analytics-alertes-traitees';
+// Taux de change personnalisés (édités via Paramètres, conservés entre sessions).
+const RATES_KEY = 'silverlit-analytics-exchange-rates';
+
+function loadRates(): Record<Devise, number> {
+  try {
+    const raw = localStorage.getItem(RATES_KEY);
+    if (!raw) return { ...DEFAULT_EXCHANGE_RATES };
+    const parsed = JSON.parse(raw) as Partial<Record<Devise, number>>;
+    return { ...DEFAULT_EXCHANGE_RATES, ...parsed, EUR: 1 };
+  } catch {
+    return { ...DEFAULT_EXCHANGE_RATES };
+  }
+}
 
 interface StoredPrefs {
   devise?: Devise;
@@ -76,12 +96,26 @@ function initAlertes(): Alerte[] {
 
 export function AppProvider({ children }: { children: ReactNode }) {
   const initial = useMemo(loadPrefs, []);
+  const initialRates = useMemo(loadRates, []);
+
   const [devise, setDevise] = useState<Devise>(initial.devise ?? 'EUR');
   const [filters, setFilters] = useState<AppFilters>(
     initial.filters ?? { period: '13S', distributeurId: 'all', gamme: 'all' },
   );
   const [dark, setDark] = useState<boolean>(initial.dark ?? false);
   const [alertes, setAlertes] = useState<Alerte[]>(initAlertes);
+  const [exchangeRates, setExchangeRatesState] = useState<Record<Devise, number>>(initialRates);
+
+  // Synchronise le module currency.ts avec l'état React dès le boot
+  // (pour que `formatMoney()` lise les bons taux dès le premier rendu).
+  useEffect(() => {
+    setAllExchangeRates(exchangeRates);
+    try {
+      localStorage.setItem(RATES_KEY, JSON.stringify(exchangeRates));
+    } catch {
+      /* no-op */
+    }
+  }, [exchangeRates]);
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark);
@@ -129,6 +163,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
       setAlertes((cur) =>
         cur.map((a) => (a.id === id ? { ...a, statut: 'ouverte' } : a)),
       ),
+    exchangeRates,
+    setExchangeRate: (d, rate) => {
+      if (d === 'EUR') return;
+      if (!isFinite(rate) || rate <= 0) return;
+      // Met à jour le state React (déclenche re-render des consumers)
+      // ET le module-level cache (pour formatMoney qui lit en sync).
+      moduleSetRate(d, rate);
+      setExchangeRatesState((cur) => ({ ...cur, [d]: rate }));
+    },
+    resetExchangeRates: () => {
+      setExchangeRatesState({ ...DEFAULT_EXCHANGE_RATES });
+    },
   };
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;

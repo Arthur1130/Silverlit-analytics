@@ -1,11 +1,20 @@
 import type { Alerte } from '../types';
 
+// Alertes seed — toutes les références (EAN + libellé) sont des produits
+// RÉELS du catalogue (cf. products.ts). Les liens « voir le produit » dans
+// l'UI redirigent donc vers une vraie fiche produit.
+//
+// Mai 2026 : correction post-audit data — les 10 alertes initiales
+// pointaient vers des EAN inexistants ; remplacement par des produits
+// du catalogue (marques EXOST, YCOO, FLYBOTIC, SPIROGRAPH) tout en
+// préservant la nature des alertes (rupture / baisse / croissance / rotation).
+
 export const ALERTES_INIT: Alerte[] = [
   {
     id: 'A-2026-001',
     type: 'rupture',
-    ean: '0730002013127',
-    libelle: 'MIRACULOUS VISION',
+    ean: '4891813202684',
+    libelle: '360 AQUACROSS 2.4GHZ - 1:18',
     distributeurId: 'joueclub',
     message: '47 magasins JouéClub en rupture depuis 9 jours — stock central à 0',
     severite: 'haute',
@@ -15,8 +24,8 @@ export const ALERTES_INIT: Alerte[] = [
   {
     id: 'A-2026-002',
     type: 'baisse',
-    ean: '4891813202103',
-    libelle: 'FURY CROSS 2.4GHZ 1-12E',
+    ean: '3700224540784',
+    libelle: '360 CROSS 10 ANS 2.4GHZ - 1:18',
     distributeurId: 'recreaclub',
     message: 'Ventes hebdo en baisse de 38% chez Récréa Club (vs 4 semaines glissantes)',
     severite: 'haute',
@@ -27,8 +36,8 @@ export const ALERTES_INIT: Alerte[] = [
   {
     id: 'A-2026-003',
     type: 'croissance',
-    ean: '4891813201915',
-    libelle: '360 TORNADO 4 GIRLS',
+    ean: '0730002030513',
+    libelle: 'ALIEN VISION',
     distributeurId: 'kingjouet',
     message: '+62% sur King Jouet — anticiper la rotation : stock central 320 unités',
     severite: 'moyenne',
@@ -39,8 +48,8 @@ export const ALERTES_INIT: Alerte[] = [
   {
     id: 'A-2026-004',
     type: 'rotation',
-    ean: '4891813206613',
-    libelle: 'BATTLE PACK',
+    ean: '4891813202578',
+    libelle: '360 CROSS 1-18E',
     distributeurId: 'carrefour',
     message: 'Rotation insuffisante chez Carrefour : 12 semaines de stock résiduel',
     severite: 'moyenne',
@@ -50,8 +59,8 @@ export const ALERTES_INIT: Alerte[] = [
   {
     id: 'A-2026-005',
     type: 'rupture',
-    ean: '8194410100176',
-    libelle: 'SPIROGRAPH COFFRET DELUXE',
+    ean: '3700224542146',
+    libelle: 'APRÈS-SKI',
     distributeurId: 'amazon',
     message: 'Rupture Amazon — réapprovisionner sous 72h, indice de demande élevé',
     severite: 'haute',
@@ -61,8 +70,8 @@ export const ALERTES_INIT: Alerte[] = [
   {
     id: 'A-2026-006',
     type: 'baisse',
-    ean: '4891813202172',
-    libelle: 'GYROTEX 2,4GHZ 1-12',
+    ean: '4891813547730',
+    libelle: '360 CROSS MX ASST 2.4GHZ - 1:18',
     distributeurId: 'joueclub',
     message: '-22% chez JouéClub par rapport à S-1 — concurrence directe Carrera ?',
     severite: 'moyenne',
@@ -73,8 +82,8 @@ export const ALERTES_INIT: Alerte[] = [
   {
     id: 'A-2026-007',
     type: 'croissance',
-    ean: '4891813212539',
-    libelle: 'MEGA BOT',
+    ean: '4891813202912',
+    libelle: '360 MINI FLIP ROSE 2.4GHZ - 1:34',
     distributeurId: 'oxybul',
     message: '+48% Oxybul — déclenchement campagne TV ? Vérifier média plan',
     severite: 'basse',
@@ -85,8 +94,8 @@ export const ALERTES_INIT: Alerte[] = [
   {
     id: 'A-2026-008',
     type: 'rupture',
-    ean: '4891813201458',
-    libelle: '360 CROSS 4GIRLS 1-18E',
+    ean: '4891813547259',
+    libelle: '360 CROSS JAUNE 1-18E FFP',
     distributeurId: 'galec',
     message: 'Rupture sur 18 hypermarchés Leclerc (Sud-Est) — réassort prévu S22',
     severite: 'moyenne',
@@ -96,8 +105,8 @@ export const ALERTES_INIT: Alerte[] = [
   {
     id: 'A-2026-009',
     type: 'rotation',
-    ean: '8194410102088',
-    libelle: 'SPIROGRAPH VOYAGE',
+    ean: '4891813202608',
+    libelle: '360 CROSS ROSE 1-18E',
     distributeurId: 'fnacdarty',
     message: 'Rotation Fnac Darty > 18 semaines, déstockage à envisager',
     severite: 'basse',
@@ -107,8 +116,8 @@ export const ALERTES_INIT: Alerte[] = [
   {
     id: 'A-2026-010',
     type: 'croissance',
-    ean: '4891813212546',
-    libelle: 'DINO BOT',
+    ean: '4891813700142',
+    libelle: 'AVION GLIDER FLOW',
     distributeurId: 'cdiscount',
     message: '+71% Cdiscount — pic post-Noël lié à un bundle Marketplace',
     severite: 'basse',

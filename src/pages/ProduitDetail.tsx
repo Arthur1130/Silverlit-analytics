@@ -16,7 +16,7 @@ const PERIOD_LABEL: Record<string, string> = {
   'S-1': 'la dernière semaine',
   '4S': '4 semaines',
   '13S': '13 semaines',
-  '52S': '52 semaines',
+  '52S': '12 mois',
   '24M': '24 mois',
 };
 

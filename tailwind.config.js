@@ -35,11 +35,12 @@ export default {
           green: '#34c759',
           blue: '#007aff',
         },
-        // Accent ANIZIA — indigo sobre pour signer le "IA", distinct du rouge
-        // Silverlit et du bleu système. Lisible en clair comme en sombre.
+        // Accent ANIZIA — bleu officiel de la marque (logo wordmark "ia").
+        // Distinct du rouge Silverlit et du bleu système. Lisible en clair
+        // comme en sombre (variante `light` plus claire pour fond foncé).
         anizia: {
-          DEFAULT: '#5b54e8',
-          light: '#8b86f2',
+          DEFAULT: '#2266dd',
+          light: '#5b9dff',
         },
         night: {
           bg: '#0a0a0a',
