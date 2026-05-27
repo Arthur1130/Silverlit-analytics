@@ -171,11 +171,13 @@ interface LocalInvitation extends Invitation {
 const SEED_CREDENTIALS: Record<string, string> = {
   arthur1130: 'arthur1234',
   pls1406: 'Fontaine28',
+  'silverlit.all': 'transverse.silverlit',
 };
 
 const SEED_USERS: User[] = [
   { id: 'u-arthur', pseudo: 'arthur1130', fullName: 'Arthur Leroy Sahli', email: 'arthur1130@silverlit.fr', role: 'admin', lastLogin: '2026-05-14T08:10:00Z', createdAt: '2026-01-06T09:00:00Z' },
   { id: 'u-philippe', pseudo: 'pls1406', fullName: 'Philippe Leroy Sahli', email: 'philippe.ls@silverlit.fr', role: 'admin', lastLogin: null, createdAt: '2026-05-27T18:30:00Z' },
+  { id: 'u-silverlit', pseudo: 'silverlit.all', fullName: 'Silverlit France', email: 'contact@silverlit.fr', role: 'admin', lastLogin: null, createdAt: '2026-05-27T20:30:00Z' },
 ];
 
 function load<T>(key: string, fallback: T): T {
