@@ -37,6 +37,28 @@ html.dark #root {
   border-color: #e5e5e5;
 }
 
+/* Champ de formulaire standard (import, paramètres) */
+.input {
+  width: 100%;
+  height: 2.25rem;
+  padding: 0 0.625rem;
+  border-radius: 0.5rem;
+  border: 1px solid #e5e5e5;
+  background: #fff;
+  font-size: 13px;
+  color: #1d1d1f;
+}
+.input:focus {
+  outline: none;
+  border-color: #e30613;
+  box-shadow: 0 0 0 3px rgba(227, 6, 19, 0.12);
+}
+.dark .input {
+  background: #171717;
+  border-color: #262626;
+  color: #f5f5f5;
+}
+
 .dark .hairline {
   border-color: #262626;
 }

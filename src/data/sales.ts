@@ -10,22 +10,11 @@
 // données — il s'étoffe au fur et à mesure des imports.
 
 import type { Vente } from '../types';
-import { SEED_VENTES } from './realSales';
-import { getImportedVentes } from './importedSales';
+import { getAllVentes } from './importBatches';
 
-// Ventes = données figées (King Jouet S1) + tout ce qui a été déposé en live.
-// Déduplication par clé (ean, distributeur, année, semaine) : un ré-import
-// d'une même semaine écrase la version figée.
-function buildVentes(): Vente[] {
-  const imported = getImportedVentes();
-  if (imported.length === 0) return SEED_VENTES;
-  const key = (v: Vente) => `${v.ean}|${v.distributeurId}|${v.annee}|${v.semaine}`;
-  const importedKeys = new Set(imported.map(key));
-  const kept = SEED_VENTES.filter((v) => !importedKeys.has(key(v)));
-  return [...kept, ...imported];
-}
-
-export const VENTES: Vente[] = buildVentes();
+// Ventes = agrégat de tous les lots d'import actifs (seedés avec King Jouet S1
+// + JouéClub S1). Supprimer/ajouter un lot via la page Import recalcule tout.
+export const VENTES: Vente[] = getAllVentes();
 
 // Calendrier dérivé des données réelles (semaines effectivement présentes),
 // trié chronologiquement.
