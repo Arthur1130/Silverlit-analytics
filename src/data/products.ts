@@ -1,6 +1,5 @@
-// GÉNÉRÉ depuis « Base Prix 1.xlsx » (grille de prix de vente conseillés Silverlit).
-// Source de vérité pour la valorisation du CA : CA = quantité × prixConseille.
-// Ne pas éditer à la main — régénérer depuis le fichier source.
+// GÉNÉRÉ depuis « Base Prix 1.xlsx » (grille PVC Silverlit) + EAN vendus hors grille.
+// CA = quantité × prixConseille. Ne pas éditer à la main.
 import type { Produit } from '../types';
 
 export const PRODUITS: Produit[] = [
@@ -41,6 +40,11 @@ export const PRODUITS: Produit[] = [
   { ean: "4891813803478", refFournisseur: "80347", libelle: "TRANSPORTEUR RADIOCOMMANDE", marque: "ASTROPOD", gamme: "Autres marques", categorie: "Mixte", statut: "fin_de_vie", prixConseille: 20.65 },
   { ean: "4891813803324", refFournisseur: "80332", libelle: "VEHICULE A ENERGIE SOLAIRE", marque: "ASTROPOD", gamme: "Autres marques", categorie: "Mixte", statut: "fin_de_vie", prixConseille: 12.41 },
   { ean: "4891813803348", refFournisseur: "80334", libelle: "VEHICULE SPATIAL MOTORISE", marque: "ASTROPOD", gamme: "Autres marques", categorie: "Mixte", statut: "fin_de_vie", prixConseille: 12.41 },
+  { ean: "3700994304692", refFournisseur: "", libelle: "HELLO MAESTRO - IL ETAIT UNE FOIS?  NOTRE TERRE - LA BIOSPHERE", marque: "Autres marques", gamme: "Autres marques", categorie: "Mixte", statut: "actif", prixConseille: 0.0 },
+  { ean: "3700994304708", refFournisseur: "", libelle: "HELLO MAESTRO - IL ETAIT UNE FOIS?  NOTRE TERRE - LE CLIMAT ET LES CHANGEMENT CLIMATIQUE", marque: "Autres marques", gamme: "Autres marques", categorie: "Mixte", statut: "actif", prixConseille: 0.0 },
+  { ean: "4891813890409", refFournisseur: "", libelle: "POUPEE 20 CM ET ACCESSOIRES - RAINBOW RUBY", marque: "Autres marques", gamme: "Autres marques", categorie: "Mixte", statut: "actif", prixConseille: 0.0 },
+  { ean: "4891813801733", refFournisseur: "", libelle: "ROBOT TRAIN FIGURINE TRANSFORMABLE", marque: "Autres marques", gamme: "Autres marques", categorie: "Mixte", statut: "actif", prixConseille: 0.0 },
+  { ean: "3700224541156", refFournisseur: "", libelle: "WATER ART PACK DELUXE", marque: "Autres marques", gamme: "Autres marques", categorie: "Mixte", statut: "actif", prixConseille: 0.0 },
   { ean: "3700224540661", refFournisseur: "54066", libelle: "DRÔLES DE POTS : BARQUETTE CHIENS", marque: "BOUTIQUE GARDEN", gamme: "Autres marques", categorie: "Mixte", statut: "actif", prixConseille: 4.13 },
   { ean: "3700224540586", refFournisseur: "54058", libelle: "DRÔLES DE POTS : BARQUETTE VANS", marque: "BOUTIQUE GARDEN", gamme: "Autres marques", categorie: "Mixte", statut: "actif", prixConseille: 5.77 },
   { ean: "3700224540852", refFournisseur: "54085", libelle: "DRÔLES DE POTS : PÈRE NOEL", marque: "BOUTIQUE GARDEN", gamme: "Autres marques", categorie: "Mixte", statut: "fin_de_vie", prixConseille: 4.13 },
@@ -530,7 +534,6 @@ export const PRODUITS: Produit[] = [
 ];
 
 const BY_EAN = new Map(PRODUITS.map((p) => [p.ean, p]));
-// Lookup tolérant aux zéros initiaux des EAN
 function normEan(e: string): string { return e.replace(/^0+/, '') || '0'; }
 const BY_NORM = new Map(PRODUITS.map((p) => [normEan(p.ean), p]));
 export const findProduit = (ean: string): Produit | undefined =>
