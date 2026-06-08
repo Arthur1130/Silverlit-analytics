@@ -54,13 +54,31 @@ export function Gouvernance() {
     });
   }, [tri, filtre]);
 
-  const totalAttendu = SOURCES.reduce((s, x) => s + x.semainesAttendues, 0);
-  const totalRecu = SOURCES.reduce((s, x) => s + x.semainesRecues, 0);
-  const tauxCompletude = totalAttendu > 0 ? (totalRecu / totalAttendu) * 100 : 0;
+  // Statistiques calculées UNIQUEMENT sur les sources actives (ayant des
+  // données importées) — sinon les 9 enseignes sans données fausseraient tout.
+  const actives = SOURCES.filter((s) => s.semainesRecues > 0);
+  const moyQualite = actives.length > 0
+    ? actives.reduce((s, x) => s + x.scoreQualite, 0) / actives.length
+    : 0;
+  const nbCritiques = actives.filter((s) => s.scoreQualite < 75).length;
+  const nbRetards = actives.filter((s) => s.semainesRecues < s.semainesAttendues).length;
 
-  const moyQualite = SOURCES.reduce((s, x) => s + x.scoreQualite, 0) / SOURCES.length;
-  const nbCritiques = SOURCES.filter((s) => s.scoreQualite < 75).length;
-  const nbRetards = SOURCES.filter((s) => s.semainesRecues < s.semainesAttendues).length;
+  // Recommandations DÉRIVÉES des vrais problèmes détectés (plus de conseils inventés)
+  const recommandations: Array<{ tone: 'red' | 'orange' | 'muted'; titre: string; detail: string }> = [];
+  for (const s of actives) {
+    const nom = findDistributeur(s.distributeurId)?.nom ?? s.distributeurId;
+    for (const pb of s.problemes) {
+      recommandations.push({ tone: 'orange', titre: `${nom} — ${pb}`, detail: 'Détecté sur les données réellement importées' });
+    }
+  }
+  const inactives = SOURCES.filter((s) => s.semainesRecues === 0);
+  if (inactives.length > 0) {
+    recommandations.push({
+      tone: 'muted',
+      titre: `${inactives.length} enseigne${inactives.length > 1 ? 's' : ''} sans données importées`,
+      detail: 'Déposer leurs fichiers hebdomadaires pour compléter le pilotage',
+    });
+  }
 
   return (
     <div className="max-w-[1320px] mx-auto">
@@ -69,16 +87,16 @@ export function Gouvernance() {
           Gouvernance des données
         </h1>
         <p className="text-sm text-ink-muted dark:text-night-muted mt-1">
-          Statut des {DISTRIBUTEURS.length} sources d'import · qualité, complétude, conventions
+          {actives.length} source{actives.length > 1 ? 's' : ''} active{actives.length > 1 ? 's' : ''} sur {DISTRIBUTEURS.length} · statut réel d'import
         </p>
       </div>
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
         <KPICard
-          label="Complétude YTD"
-          value={`${tauxCompletude.toFixed(0)}%`}
-          deltaLabel={`${totalRecu} / ${totalAttendu} fichiers attendus`}
-          intent={tauxCompletude > 90 ? 'success' : tauxCompletude > 75 ? 'warn' : 'danger'}
+          label="Sources actives"
+          value={`${actives.length} / ${DISTRIBUTEURS.length}`}
+          deltaLabel="enseignes avec données"
+          intent={actives.length > 0 ? 'success' : 'warn'}
           icon={<CheckCircle2 size={14} />}
         />
         <KPICard
@@ -228,7 +246,9 @@ export function Gouvernance() {
                   <div className="col-span-6 md:col-span-2">
                     <p className="text-2xs uppercase tracking-wider text-ink-muted mb-1">Dernier envoi</p>
                     <p className="text-xs text-ink dark:text-night-ink">
-                      S{String(s.derniereSemaine).padStart(2, '0')} · {formatRelativeDate(s.derniereDate)}
+                      {s.derniereSemaine > 0
+                        ? `S${String(s.derniereSemaine).padStart(2, '0')}${s.derniereDate ? ` · ${formatRelativeDate(s.derniereDate)}` : ''}`
+                        : 'Aucun import'}
                     </p>
                     <div className="mt-2">
                       <div className="flex items-center justify-between text-2xs mb-1">
@@ -302,54 +322,28 @@ export function Gouvernance() {
         <Card>
           <SectionHeader
             title="Actions recommandées"
-            subtitle="Optimisations prioritaires détectées"
+            subtitle="Issues des problèmes réellement détectés à l'import"
           />
-          <ul className="space-y-3 text-sm">
-            <li className="flex gap-3 items-start">
-              <span className="w-1.5 h-1.5 rounded-full bg-brand-red mt-2 shrink-0" />
-              <div>
-                <p className="text-[13px] text-ink dark:text-night-ink">
-                  Migrer Cdiscount d'un dépôt manuel vers une API marketplace
-                </p>
-                <p className="text-2xs text-ink-muted mt-0.5">
-                  Gain estimé : 3-5 jours de fraîcheur des données, score qualité +15 points
-                </p>
-              </div>
-            </li>
-            <li className="flex gap-3 items-start">
-              <span className="w-1.5 h-1.5 rounded-full bg-brand-orange mt-2 shrink-0" />
-              <div>
-                <p className="text-[13px] text-ink dark:text-night-ink">
-                  Standardiser la périodicité Oxybul (mensuel → hebdomadaire)
-                </p>
-                <p className="text-2xs text-ink-muted mt-0.5">
-                  Permet la détection précoce de ruptures et croissances
-                </p>
-              </div>
-            </li>
-            <li className="flex gap-3 items-start">
-              <span className="w-1.5 h-1.5 rounded-full bg-brand-orange mt-2 shrink-0" />
-              <div>
-                <p className="text-[13px] text-ink dark:text-night-ink">
-                  Demander à Fnac Darty un export au format XLSX (vs XLS legacy)
-                </p>
-                <p className="text-2xs text-ink-muted mt-0.5">
-                  Suppression du parseur dédié, fiabilisation des libellés produits
-                </p>
-              </div>
-            </li>
-            <li className="flex gap-3 items-start">
-              <span className="w-1.5 h-1.5 rounded-full bg-ink-muted mt-2 shrink-0" />
-              <div>
-                <p className="text-[13px] text-ink dark:text-night-ink">
-                  Documenter le mapping E.Leclerc et Carrefour dans le wiki interne
-                </p>
-                <p className="text-2xs text-ink-muted mt-0.5">
-                  Réduit le bus factor sur les enseignes les plus volumineuses
-                </p>
-              </div>
-            </li>
-          </ul>
+          {recommandations.length === 0 ? (
+            <p className="text-xs text-ink-muted py-6 text-center">
+              Aucune anomalie détectée sur les données importées.
+            </p>
+          ) : (
+            <ul className="space-y-3 text-sm">
+              {recommandations.map((r, i) => (
+                <li key={i} className="flex gap-3 items-start">
+                  <span className={classNames(
+                    'w-1.5 h-1.5 rounded-full mt-2 shrink-0',
+                    r.tone === 'red' ? 'bg-brand-red' : r.tone === 'orange' ? 'bg-brand-orange' : 'bg-ink-muted',
+                  )} />
+                  <div>
+                    <p className="text-[13px] text-ink dark:text-night-ink">{r.titre}</p>
+                    <p className="text-2xs text-ink-muted mt-0.5">{r.detail}</p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
         </Card>
       </div>
     </div>

@@ -1,7 +1,9 @@
 // Gouvernance des sources de données par distributeur
-// Décrit pour chaque enseigne : format attendu, périodicité, dernier import,
-// score qualité, et le contact référent. Reflète l'arborescence réelle
-// "STATS 2026" reçue chaque semaine.
+// Config descriptive (format, canal, conventions) + statut RÉEL calculé
+// depuis les lots importés (semaines reçues, qualité, problèmes).
+
+import { getBatches } from './importBatches';
+import { findProduit } from './products';
 
 export type FormatSource = 'CSV' | 'XLSX' | 'XLSM' | 'XLS';
 export type Periodicite = 'hebdo' | 'bi-hebdo' | 'mensuel';
@@ -28,7 +30,10 @@ export interface SourceDistributeur {
   inclutStock: boolean;
 }
 
-export const SOURCES: SourceDistributeur[] = [
+// Configuration descriptive par source (format, canal, conventions).
+// Les champs de STATUT (semaines reçues, qualité, problèmes, dates) sont
+// recalculés à partir des vrais lots importés — cf. computeStatus() en bas.
+const SOURCES_CONFIG: SourceDistributeur[] = [
   {
     distributeurId: 'joueclub',
     format: 'CSV',
@@ -244,5 +249,53 @@ export const SOURCES: SourceDistributeur[] = [
     inclutStock: true,
   },
 ];
+
+// =======================================================================
+//   Statut RÉEL calculé depuis les lots importés (plus aucune valeur inventée)
+// =======================================================================
+
+type Status = Pick<SourceDistributeur,
+  'derniereSemaine' | 'derniereDate' | 'semainesAttendues' | 'semainesRecues' | 'scoreQualite' | 'problemes'>;
+
+function computeStatus(distId: string): Status {
+  const batches = getBatches().filter((b) => b.distributeurId === distId);
+  if (batches.length === 0) {
+    return {
+      derniereSemaine: 0, derniereDate: '', semainesAttendues: 0,
+      semainesRecues: 0, scoreQualite: 0, problemes: ['Aucune donnée importée'],
+    };
+  }
+  const semaines = [...new Set(batches.map((b) => b.semaine))].sort((a, b) => a - b);
+  const derniereSemaine = Math.max(...semaines);
+  const semainesRecues = semaines.length;
+  // « Attendu » = jusqu'à la dernière semaine reçue (met en évidence les trous)
+  const semainesAttendues = derniereSemaine;
+
+  // Qualité = % des quantités effectivement valorisées par la grille
+  let totalQ = 0, valQ = 0, unpriced = 0;
+  for (const b of batches) {
+    for (const r of b.rows) {
+      const q = Math.abs(r.qteVendue);
+      totalQ += q;
+      const p = findProduit(r.ean);
+      if (p && p.prixConseille > 0) valQ += q; else unpriced += 1;
+    }
+  }
+  const scoreQualite = totalQ > 0 ? Math.round((valQ / totalQ) * 100) : 100;
+
+  const problemes: string[] = [];
+  const missing = [];
+  for (let w = 1; w <= derniereSemaine; w++) if (!semaines.includes(w)) missing.push(w);
+  if (missing.length) problemes.push(`Semaine(s) manquante(s) : ${missing.join(', ')}`);
+  if (unpriced > 0) problemes.push(`${unpriced} référence(s) hors grille de prix`);
+
+  const derniereDate = batches.map((b) => b.importedAt).filter(Boolean).sort().pop() ?? '';
+  return { derniereSemaine, derniereDate, semainesAttendues, semainesRecues, scoreQualite, problemes };
+}
+
+export const SOURCES: SourceDistributeur[] = SOURCES_CONFIG.map((s) => ({
+  ...s,
+  ...computeStatus(s.distributeurId),
+}));
 
 export const findSource = (id: string) => SOURCES.find((s) => s.distributeurId === id);
