@@ -1,14 +1,13 @@
 import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import {
-  AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid, BarChart, Bar,
+  AreaChart, Area, XAxis, YAxis, ResponsiveContainer, Tooltip, CartesianGrid,
 } from 'recharts';
 import { ArrowLeft, Store, FileSpreadsheet } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { Card, KPICard, SectionHeader, Badge } from '../components/ui';
 import {
-  findDistributeur, magasinsByDistributeur, magasinRealShare,
-  VENTES, findProduit, PRODUITS, isEcommerce,
+  findDistributeur, VENTES, findProduit, PRODUITS, isEcommerce,
 } from '../data';
 import { formatMoney, formatNumber } from '../utils/currency';
 import { weekShort } from '../utils/format';
@@ -27,7 +26,6 @@ export function DistributeurDetail() {
   const { id = '' } = useParams();
   const { devise, filters } = useApp();
   const distributeur = findDistributeur(id);
-  const magasins = magasinsByDistributeur(id);
   const [exporting, setExporting] = useState(false);
 
   async function handleExport() {
@@ -89,47 +87,6 @@ export function DistributeurDetail() {
   const periodLabel = PERIOD_LABEL[filters.period] ?? filters.period;
   const ecom = distributeur ? isEcommerce(distributeur) : false;
 
-  const byRegion = useMemo(() => {
-    if (ecom) return [];
-    const map = new Map<string, { region: string; ca: number; stores: number }>();
-    for (const m of magasins) {
-      const cur = map.get(m.region) ?? { region: m.region, ca: 0, stores: 0 };
-      cur.stores += 1;
-      map.set(m.region, cur);
-    }
-    // Ventes ne sont pas attribuées au magasin individuellement (agrégé), on distribue proportionnellement
-    const totalCa = totals.ca;
-    const totalStores = magasins.length;
-    return Array.from(map.values())
-      .map((r) => ({ ...r, ca: (totalCa * r.stores) / Math.max(1, totalStores) }))
-      .sort((a, b) => b.ca - a.ca);
-  }, [magasins, totals.ca, ecom]);
-
-  // "Top magasins" — on alloue le CA du distributeur magasin par magasin
-  // via `magasinRealShare()`, qui tient compte du parc réel (nbMagasins).
-  // Les valeurs ici sont donc DIRECTEMENT comparables à celles affichées
-  // sur la page détail du magasin (cohérence garantie).
-  const topMagasins = useMemo(() => {
-    if (ecom || !distributeur) return [];
-    const totalCa = totals.ca;
-    const totalQte = totals.qte;
-    return magasins
-      .map((m) => {
-        const share = magasinRealShare(m, distributeur);
-        // % de rupture déterministe diversifié (cohérent avec MagasinDetail)
-        const ruptSeed = (m.code.charCodeAt(0)
-          + m.code.charCodeAt(m.code.length - 1) * 7) % 100;
-        return {
-          ...m,
-          ca: totalCa * share,
-          qte: Math.round(totalQte * share),
-          rupture: Math.round((ruptSeed / 100) * 22),
-        };
-      })
-      .sort((a, b) => b.ca - a.ca)
-      .slice(0, 8);
-  }, [magasins, totals, ecom, distributeur]);
-
   if (!distributeur) {
     return (
       <div className="max-w-[1320px] mx-auto py-12 text-center">
@@ -141,10 +98,6 @@ export function DistributeurDetail() {
       </div>
     );
   }
-
-  const tauxRuptureGlobal = topMagasins.length > 0
-    ? topMagasins.reduce((s, m) => s + m.rupture, 0) / topMagasins.length
-    : 0;
 
   return (
     <div className="max-w-[1320px] mx-auto">
@@ -184,10 +137,9 @@ export function DistributeurDetail() {
         <KPICard label={`Quantités · ${periodLabel}`} value={formatNumber(totals.qte, { compact: true })} />
         <KPICard label="Références distribuées" value={String(totals.refs)} deltaLabel={`sur la période`} />
         <KPICard
-          label="Taux de rupture moyen"
-          value={`${tauxRuptureGlobal.toFixed(1)}%`}
-          intent={tauxRuptureGlobal > 15 ? 'danger' : tauxRuptureGlobal > 8 ? 'warn' : 'success'}
-          deltaLabel="moyenne magasins"
+          label="Panier moyen"
+          value={formatMoney(totals.qte > 0 ? totals.ca / totals.qte : 0, devise, { decimals: 2 })}
+          deltaLabel="CA / quantité"
         />
       </div>
 
@@ -274,107 +226,42 @@ export function DistributeurDetail() {
           </div>
         </Card>
 
-        {!ecom ? (
-          <Card>
-            <SectionHeader
-              title="Top magasins"
-              subtitle="Cliquez sur un magasin pour voir son détail"
-            />
-            <ul className="space-y-1">
-              {topMagasins.map((m) => (
-                <li key={m.code}>
-                  <Link
-                    to={`/distributeurs/${distributeur.id}/magasins/${m.code}`}
-                    className="flex items-center justify-between gap-3 py-1.5 px-1 rounded hover:bg-surface-alt dark:hover:bg-night-alt group"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="text-[13px] text-ink dark:text-night-ink truncate group-hover:underline">
-                        {m.libelle}
-                      </p>
-                      <p className="text-2xs text-ink-muted">{m.ville} · {m.region}</p>
+        <Card>
+          <SectionHeader
+            title="Répartition par gamme"
+            subtitle={`Mix produit · ${periodLabel}`}
+          />
+          {byGamme.length === 0 ? (
+            <p className="text-xs text-ink-muted py-8 text-center">
+              Aucune vente sur la période sélectionnée.
+            </p>
+          ) : (
+            <ul className="space-y-2.5">
+              {byGamme.map((g) => (
+                <li key={g.gamme}>
+                  <div className="flex items-center justify-between text-sm mb-1">
+                    <span className="text-ink dark:text-night-ink">{g.gamme}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="tabular text-ink dark:text-night-ink">
+                        {formatMoney(g.ca, devise, { compact: true })}
+                      </span>
+                      <span className="tabular text-2xs text-ink-muted w-9 text-right">
+                        {g.pct.toFixed(0)}%
+                      </span>
                     </div>
-                    <div className="text-right shrink-0">
-                      <p className="text-[13px] tabular text-ink dark:text-night-ink">
-                        {formatMoney(m.ca, devise, { compact: true })}
-                      </p>
-                      <p className="text-2xs tabular text-ink-muted">
-                        {formatNumber(m.qte)} u. · {m.rupture}% rupture
-                      </p>
-                    </div>
-                  </Link>
+                  </div>
+                  <div className="h-1 bg-surface-alt dark:bg-night-alt rounded overflow-hidden">
+                    <div
+                      className="h-full"
+                      style={{ background: distributeur.logoColor, width: `${g.pct}%` }}
+                    />
+                  </div>
                 </li>
               ))}
             </ul>
-          </Card>
-        ) : (
-          <Card>
-            <SectionHeader
-              title="Répartition par gamme"
-              subtitle={`Mix produit · ${periodLabel}`}
-            />
-            {byGamme.length === 0 ? (
-              <p className="text-xs text-ink-muted py-8 text-center">
-                Aucune vente sur la période sélectionnée.
-              </p>
-            ) : (
-              <ul className="space-y-2.5">
-                {byGamme.map((g) => (
-                  <li key={g.gamme}>
-                    <div className="flex items-center justify-between text-sm mb-1">
-                      <span className="text-ink dark:text-night-ink">{g.gamme}</span>
-                      <div className="flex items-center gap-2">
-                        <span className="tabular text-ink dark:text-night-ink">
-                          {formatMoney(g.ca, devise, { compact: true })}
-                        </span>
-                        <span className="tabular text-2xs text-ink-muted w-9 text-right">
-                          {g.pct.toFixed(0)}%
-                        </span>
-                      </div>
-                    </div>
-                    <div className="h-1 bg-surface-alt dark:bg-night-alt rounded overflow-hidden">
-                      <div
-                        className="h-full"
-                        style={{ background: distributeur.logoColor, width: `${g.pct}%` }}
-                      />
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </Card>
-        )}
-      </div>
-
-      {byRegion.length > 0 && (
-        <Card>
-          <SectionHeader title="Performance par région" subtitle="Estimation au prorata du nombre de magasins" />
-          <div className="h-[240px] -ml-4">
-            <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
-              <BarChart data={byRegion} margin={{ top: 8, right: 16, left: 8, bottom: 40 }}>
-                <CartesianGrid stroke="#d2d2d7" strokeDasharray="2 2" strokeOpacity={0.5} vertical={false} />
-                <XAxis
-                  dataKey="region"
-                  tick={{ fontSize: 10, fill: '#86868b' }}
-                  axisLine={false}
-                  tickLine={false}
-                  angle={-30}
-                  textAnchor="end"
-                  height={60}
-                />
-                <YAxis
-                  tick={{ fontSize: 11, fill: '#86868b' }}
-                  axisLine={false}
-                  tickLine={false}
-                  tickFormatter={(v) => formatMoney(v as number, devise, { compact: true })}
-                  width={70}
-                />
-                <Tooltip formatter={(v: unknown) => typeof v === "number" ? formatMoney(v, devise, { decimals: 0 }) : ""} />
-                <Bar dataKey="ca" fill={distributeur.logoColor} radius={[3, 3, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          )}
         </Card>
-      )}
+      </div>
     </div>
   );
 }
