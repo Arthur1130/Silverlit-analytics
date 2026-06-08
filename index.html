@@ -34,7 +34,13 @@
          typographique du wordmark (à activer si on importe Inter). -->
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:-apple-system,system-ui,sans-serif;background:#fafafa;color:#86868b">
+        <div style="width:26px;height:26px;border:2px solid #e5e5e5;border-top-color:#e30613;border-radius:50%;animation:sl-spin .7s linear infinite"></div>
+        <p style="margin-top:14px;font-size:13px">Chargement des données…</p>
+      </div>
+      <style>@keyframes sl-spin{to{transform:rotate(360deg)}}</style>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
