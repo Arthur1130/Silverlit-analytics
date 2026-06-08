@@ -102,6 +102,8 @@ export function Infographie() {
     return { caPrev: ca, qtePrev: qte };
   }, [prev]);
 
+  // Une comparaison n'a de sens que s'il existe une période précédente réelle
+  const hasComparison = prev.length > 0;
   const deltaCA = caPrev > 0 ? ((ca - caPrev) / caPrev) * 100 : 0;
   const deltaQte = qtePrev > 0 ? ((qte - qtePrev) / qtePrev) * 100 : 0;
 
@@ -536,8 +538,8 @@ export function Infographie() {
 
             {/* Hero KPIs */}
             <div className="grid grid-cols-4 gap-3 mb-8">
-              <KPIBlock label="Chiffre d'affaires" value={formatMoney(ca, devise, { compact: true })} delta={deltaCA} deltaLabel={compareLabel} accent={accentClass.text} />
-              <KPIBlock label="Quantités" value={formatNumber(qte, { compact: true })} delta={deltaQte} deltaLabel={compareLabel} accent={accentClass.text} />
+              <KPIBlock label="Chiffre d'affaires" value={formatMoney(ca, devise, { compact: true })} delta={hasComparison ? deltaCA : undefined} deltaLabel={compareLabel} subtitle="période importée" accent={accentClass.text} />
+              <KPIBlock label="Quantités" value={formatNumber(qte, { compact: true })} delta={hasComparison ? deltaQte : undefined} deltaLabel={compareLabel} subtitle="période importée" accent={accentClass.text} />
               <KPIBlock label="Références" value={String(refs)} subtitle={`sur ${PRODUITS.length} catalogue`} accent={accentClass.text} />
               <KPIBlock label="Distributeurs" value={String(selectedDist.size)} subtitle={`sur ${DISTRIBUTEURS.length} sources`} accent={accentClass.text} />
             </div>
@@ -585,14 +587,16 @@ export function Infographie() {
                       <span className="w-2 h-2 rounded-full shrink-0" style={{ background: d.logoColor }} />
                       <span className="text-[13px] truncate flex-1">{d.nom}</span>
                       <span className="text-[13px] tabular text-ink">{formatMoney(d.ca, devise, { compact: true })}</span>
-                      <span
-                        className={classNames(
-                          'text-2xs tabular w-14 text-right shrink-0',
-                          d.delta > 0 ? 'text-brand-green' : d.delta < 0 ? 'text-brand-red' : 'text-ink-muted',
-                        )}
-                      >
-                        {formatPct(d.delta, { signed: true })}
-                      </span>
+                      {hasComparison && (
+                        <span
+                          className={classNames(
+                            'text-2xs tabular w-14 text-right shrink-0',
+                            d.delta > 0 ? 'text-brand-green' : d.delta < 0 ? 'text-brand-red' : 'text-ink-muted',
+                          )}
+                        >
+                          {formatPct(d.delta, { signed: true })}
+                        </span>
+                      )}
                     </li>
                   ))}
                 </ul>
