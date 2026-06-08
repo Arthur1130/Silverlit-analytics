@@ -43,7 +43,11 @@ export function ProduitDetail() {
 
   const last4 = weekSerie.slice(-4).reduce((s, w) => s + w.ca, 0);
   const prev4 = weekSerie.slice(-8, -4).reduce((s, w) => s + w.ca, 0);
-  const delta4 = prev4 > 0 ? ((last4 - prev4) / prev4) * 100 : 0;
+  // undefined s'il n'y a pas de période précédente (pas de faux 0 %)
+  const delta4 = prev4 > 0 ? ((last4 - prev4) / prev4) * 100 : undefined;
+  // Nombre réel de semaines présentes (pour des libellés honnêtes)
+  const nbWeeks = weekSerie.length;
+  const recentLabel = nbWeeks >= 4 ? '4 semaines glissantes' : `${nbWeeks} semaine${nbWeeks > 1 ? 's' : ''}`;
 
   // Répartition par enseigne sur la période sélectionnée.
   // On ne liste QUE les distributeurs qui référencent réellement le produit.
@@ -119,16 +123,16 @@ export function ProduitDetail() {
         <KPICard label={`CA · ${periodLabel}`} value={formatMoney(totals.ca, devise, { compact: true })} />
         <KPICard label={`Quantités · ${periodLabel}`} value={formatNumber(totals.qte, { compact: true })} />
         <KPICard
-          label="4 semaines glissantes"
+          label={recentLabel}
           value={formatMoney(last4, devise, { compact: true })}
           delta={delta4}
-          deltaLabel="vs 4 semaines précédentes"
+          deltaLabel={delta4 !== undefined ? 'vs période précédente' : undefined}
         />
         <KPICard label="Stock disponible" value={formatNumber(totals.stock)} deltaLabel="sur tous distributeurs" />
       </div>
 
       <Card className="mb-6">
-        <SectionHeader title="Historique 24 mois" subtitle="Évolution hebdomadaire du chiffre d'affaires" />
+        <SectionHeader title="Évolution du chiffre d'affaires" subtitle="Par semaine, sur les données importées" />
         <div className="h-[260px] -ml-4">
           <ResponsiveContainer width="100%" height="100%" minWidth={0} minHeight={0}>
             <AreaChart data={weekSerie} margin={{ top: 8, right: 16, left: 8, bottom: 0 }}>

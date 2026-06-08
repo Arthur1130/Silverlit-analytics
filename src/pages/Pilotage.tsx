@@ -29,7 +29,11 @@ export function Pilotage() {
   const gammes = useMemo(() => caByGamme(ventes), [ventes]);
   const top = useMemo(() => topProduits(ventes, 8), [ventes]);
 
-  const delta = (a: number, b: number) => (b > 0 ? ((a - b) / b) * 100 : 0);
+  // Renvoie undefined s'il n'y a pas de période précédente à comparer
+  // (évite d'afficher un faux « +0,0 % » trompeur).
+  const delta = (a: number, b: number): number | undefined => (b > 0 ? ((a - b) / b) * 100 : undefined);
+  const hasPrev = prev.length > 0;
+  const prevLabel = hasPrev ? 'vs période précédente' : undefined;
 
   const alertesOuvertes = alertes.filter((a) => a.statut === 'ouverte');
   const haute = alertesOuvertes.filter((a) => a.severite === 'haute').length;
@@ -52,7 +56,7 @@ export function Pilotage() {
             label="Chiffre d'affaires"
             value={formatMoney(kpi.ca, devise, { compact: true })}
             delta={delta(kpi.ca, kpiPrev.ca)}
-            deltaLabel="vs période précédente"
+            deltaLabel={prevLabel}
             icon={<TrendingUp size={14} />}
           />
         </div>
@@ -61,7 +65,7 @@ export function Pilotage() {
             label="Quantités vendues"
             value={formatNumber(kpi.qte, { compact: true })}
             delta={delta(kpi.qte, kpiPrev.qte)}
-            deltaLabel="vs période précédente"
+            deltaLabel={prevLabel}
             icon={<Package size={14} />}
           />
         </div>
@@ -78,7 +82,7 @@ export function Pilotage() {
             label="Panier moyen"
             value={formatMoney(kpi.panierMoyen, devise, { decimals: 2 })}
             delta={delta(kpi.panierMoyen, kpiPrev.panierMoyen)}
-            deltaLabel="vs période précédente"
+            deltaLabel={prevLabel}
             icon={<Store size={14} />}
           />
         </div>

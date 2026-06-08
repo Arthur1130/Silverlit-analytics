@@ -82,9 +82,10 @@ export function DistributeurDetail() {
     return { ca, qte, refs: refs.size };
   }, [ventes]);
 
-  const last4 = weekSerie.slice(-4).reduce((s, w) => s + w.ca, 0);
   const prev4 = weekSerie.slice(-8, -4).reduce((s, w) => s + w.ca, 0);
-  const delta4 = prev4 > 0 ? ((last4 - prev4) / prev4) * 100 : 0;
+  const last4 = weekSerie.slice(-4).reduce((s, w) => s + w.ca, 0);
+  // undefined s'il n'y a pas de période précédente (pas de faux 0 %)
+  const delta4 = prev4 > 0 ? ((last4 - prev4) / prev4) * 100 : undefined;
   const periodLabel = PERIOD_LABEL[filters.period] ?? filters.period;
   const ecom = distributeur ? isEcommerce(distributeur) : false;
 
@@ -193,11 +194,15 @@ export function DistributeurDetail() {
       <Card className="mb-6">
         <SectionHeader
           title="Performance hebdomadaire"
-          subtitle="Évolution du CA sur 24 mois"
+          subtitle="Évolution du CA par semaine, sur les données importées"
           action={
-            <Badge tone="info">
-              4S récentes {delta4 > 0 ? '+' : ''}{delta4.toFixed(1)}%
-            </Badge>
+            delta4 !== undefined ? (
+              <Badge tone="info">
+                Récent {delta4 > 0 ? '+' : ''}{delta4.toFixed(1)}%
+              </Badge>
+            ) : (
+              <Badge>{weekSerie.length} semaine{weekSerie.length > 1 ? 's' : ''}</Badge>
+            )
           }
         />
         <div className="h-[260px] -ml-4">
