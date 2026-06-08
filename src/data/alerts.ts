@@ -1,128 +1,73 @@
-import type { Alerte } from '../types';
+import type { Alerte, Severite } from '../types';
+import { VENTES } from './sales';
+import { findProduit } from './products';
+import { findDistributeur } from './distributors';
 
-// Alertes seed — toutes les références (EAN + libellé) sont des produits
-// RÉELS du catalogue (cf. products.ts). Les liens « voir le produit » dans
-// l'UI redirigent donc vers une vraie fiche produit.
+// Alertes DÉRIVÉES des vraies ventes importées — aucune valeur inventée.
 //
-// Mai 2026 : correction post-audit data — les 10 alertes initiales
-// pointaient vers des EAN inexistants ; remplacement par des produits
-// du catalogue (marques EXOST, YCOO, FLYBOTIC, SPIROGRAPH) tout en
-// préservant la nature des alertes (rupture / baisse / croissance / rotation).
+// Signaux réels détectables sur les données présentes :
+//   - solde net négatif (retours > ventes) sur un (produit × distributeur)
+//   - référence en fin de vie encore vendue (à déstocker)
+//   - rupture potentielle : ventes significatives mais stock à 0
+//
+// Si aucune donnée n'est importée, la liste est vide (état honnête).
+// Les ID sont déterministes pour que le statut « traité » persiste.
 
-export const ALERTES_INIT: Alerte[] = [
-  {
-    id: 'A-2026-001',
-    type: 'rupture',
-    ean: '4891813202684',
-    libelle: '360 AQUACROSS 2.4GHZ - 1:18',
-    distributeurId: 'joueclub',
-    message: '47 magasins JouéClub en rupture depuis 9 jours — stock central à 0',
-    severite: 'haute',
-    dateCreation: '2026-05-04T08:42:00Z',
-    statut: 'ouverte',
-  },
-  {
-    id: 'A-2026-002',
-    type: 'baisse',
-    ean: '3700224540784',
-    libelle: '360 CROSS 10 ANS 2.4GHZ - 1:18',
-    distributeurId: 'recreaclub',
-    message: 'Ventes hebdo en baisse de 38% chez Récréa Club (vs 4 semaines glissantes)',
-    severite: 'haute',
-    dateCreation: '2026-05-04T10:15:00Z',
-    statut: 'ouverte',
-    delta: -38,
-  },
-  {
-    id: 'A-2026-003',
-    type: 'croissance',
-    ean: '0730002030513',
-    libelle: 'ALIEN VISION',
-    distributeurId: 'kingjouet',
-    message: '+62% sur King Jouet — anticiper la rotation : stock central 320 unités',
-    severite: 'moyenne',
-    dateCreation: '2026-05-03T14:22:00Z',
-    statut: 'ouverte',
-    delta: 62,
-  },
-  {
-    id: 'A-2026-004',
-    type: 'rotation',
-    ean: '4891813202578',
-    libelle: '360 CROSS 1-18E',
-    distributeurId: 'carrefour',
-    message: 'Rotation insuffisante chez Carrefour : 12 semaines de stock résiduel',
-    severite: 'moyenne',
-    dateCreation: '2026-05-03T09:01:00Z',
-    statut: 'ouverte',
-  },
-  {
-    id: 'A-2026-005',
-    type: 'rupture',
-    ean: '3700224542146',
-    libelle: 'APRÈS-SKI',
-    distributeurId: 'amazon',
-    message: 'Rupture Amazon — réapprovisionner sous 72h, indice de demande élevé',
-    severite: 'haute',
-    dateCreation: '2026-05-04T07:30:00Z',
-    statut: 'ouverte',
-  },
-  {
-    id: 'A-2026-006',
-    type: 'baisse',
-    ean: '4891813547730',
-    libelle: '360 CROSS MX ASST 2.4GHZ - 1:18',
-    distributeurId: 'joueclub',
-    message: '-22% chez JouéClub par rapport à S-1 — concurrence directe Carrera ?',
-    severite: 'moyenne',
-    dateCreation: '2026-05-02T16:48:00Z',
-    statut: 'ouverte',
-    delta: -22,
-  },
-  {
-    id: 'A-2026-007',
-    type: 'croissance',
-    ean: '4891813202912',
-    libelle: '360 MINI FLIP ROSE 2.4GHZ - 1:34',
-    distributeurId: 'oxybul',
-    message: '+48% Oxybul — déclenchement campagne TV ? Vérifier média plan',
-    severite: 'basse',
-    dateCreation: '2026-05-02T11:12:00Z',
-    statut: 'ouverte',
-    delta: 48,
-  },
-  {
-    id: 'A-2026-008',
-    type: 'rupture',
-    ean: '4891813547259',
-    libelle: '360 CROSS JAUNE 1-18E FFP',
-    distributeurId: 'galec',
-    message: 'Rupture sur 18 hypermarchés Leclerc (Sud-Est) — réassort prévu S22',
-    severite: 'moyenne',
-    dateCreation: '2026-05-01T19:00:00Z',
-    statut: 'ouverte',
-  },
-  {
-    id: 'A-2026-009',
-    type: 'rotation',
-    ean: '4891813202608',
-    libelle: '360 CROSS ROSE 1-18E',
-    distributeurId: 'fnacdarty',
-    message: 'Rotation Fnac Darty > 18 semaines, déstockage à envisager',
-    severite: 'basse',
-    dateCreation: '2026-04-30T13:00:00Z',
-    statut: 'ouverte',
-  },
-  {
-    id: 'A-2026-010',
-    type: 'croissance',
-    ean: '4891813700142',
-    libelle: 'AVION GLIDER FLOW',
-    distributeurId: 'cdiscount',
-    message: '+71% Cdiscount — pic post-Noël lié à un bundle Marketplace',
-    severite: 'basse',
-    dateCreation: '2026-04-29T09:30:00Z',
-    statut: 'ouverte',
-    delta: 71,
-  },
-];
+const SEV_RANK: Record<Severite, number> = { haute: 0, moyenne: 1, basse: 2 };
+
+// Date de référence = période des données (semaine 1). Honnête : l'alerte
+// porte sur cette semaine, pas sur « aujourd'hui ».
+const DATE_REF = '2026-01-12T09:00:00Z';
+
+function generateAlertes(): Alerte[] {
+  // Agrégat par (ean, distributeur)
+  const map = new Map<string, { ean: string; dist: string; qte: number; ca: number; stock: number }>();
+  for (const v of VENTES) {
+    const k = `${v.ean}|${v.distributeurId}`;
+    const cur = map.get(k) ?? { ean: v.ean, dist: v.distributeurId, qte: 0, ca: 0, stock: 0 };
+    cur.qte += v.qteVendue;
+    cur.ca += v.caTTC;
+    cur.stock = Math.max(cur.stock, v.qteStock);
+    map.set(k, cur);
+  }
+
+  const alerts: Alerte[] = [];
+  for (const r of map.values()) {
+    const p = findProduit(r.ean);
+    if (!p) continue;
+    const distNom = findDistributeur(r.dist)?.nom ?? r.dist;
+
+    // 1. Solde net négatif (retours > ventes) — signal fort et réel
+    if (r.qte < 0) {
+      alerts.push({
+        id: `ret-${r.dist}-${r.ean}`, type: 'baisse', ean: r.ean, libelle: p.libelle,
+        distributeurId: r.dist,
+        message: `Solde net négatif chez ${distNom} : ${r.qte} u. (retours supérieurs aux ventes)`,
+        severite: 'moyenne', dateCreation: DATE_REF, statut: 'ouverte', delta: r.qte,
+      });
+    } else if (p.statut === 'fin_de_vie' && r.qte >= 30) {
+      // 2. Fin de vie à fort volume (best-seller en arrêt → gérer le déstockage)
+      alerts.push({
+        id: `fdv-${r.dist}-${r.ean}`, type: 'rotation', ean: r.ean, libelle: p.libelle,
+        distributeurId: r.dist,
+        message: `Référence en fin de vie à fort volume chez ${distNom} (${r.qte} u.) — anticiper le déstockage`,
+        severite: 'moyenne', dateCreation: DATE_REF, statut: 'ouverte', delta: r.qte,
+      });
+    } else if (r.qte >= 10 && r.stock === 0) {
+      // 3. Rupture potentielle : ventes significatives, stock à 0
+      alerts.push({
+        id: `rup-${r.dist}-${r.ean}`, type: 'rupture', ean: r.ean, libelle: p.libelle,
+        distributeurId: r.dist,
+        message: `Stock à 0 chez ${distNom} malgré ${r.qte} u. vendues — risque de rupture`,
+        severite: 'haute', dateCreation: DATE_REF, statut: 'ouverte',
+      });
+    }
+  }
+
+  // Tri par sévérité puis volume, plafonné pour rester lisible
+  return alerts
+    .sort((a, b) => SEV_RANK[a.severite] - SEV_RANK[b.severite] || Math.abs(b.delta ?? 0) - Math.abs(a.delta ?? 0))
+    .slice(0, 15);
+}
+
+export const ALERTES_INIT: Alerte[] = generateAlertes();
