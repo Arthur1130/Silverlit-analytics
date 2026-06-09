@@ -35,8 +35,13 @@ function buildMailto(email: string, role: Role, link: string, inviterName: strin
 export function Equipe() {
   const {
     user, isAdmin, backendMode, users, invitations, demandes, teamLoaded, refreshTeam,
-    inviteUser, cancelInvitation, resendInvitation, updateUserRole, removeUser,
+    inviteUser, cancelInvitation, resendInvitation, updateUserRole, removeUser, createUser,
   } = useAuth();
+
+  // Création directe d'un compte (pseudo + mot de passe → base partagée)
+  const [cu, setCu] = useState({ pseudo: '', fullName: '', email: '', password: '', role: 'analyste' as Role });
+  const [cuBusy, setCuBusy] = useState(false);
+  const [cuMsg, setCuMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<Role>('analyste');
@@ -118,6 +123,26 @@ export function Equipe() {
     }
   }
 
+  async function submitCreateUser(e: React.FormEvent) {
+    e.preventDefault();
+    setCuBusy(true);
+    setCuMsg(null);
+    const res = await createUser({
+      pseudo: cu.pseudo.trim(),
+      fullName: cu.fullName.trim(),
+      email: cu.email.trim(),
+      role: cu.role,
+      password: cu.password,
+    });
+    setCuBusy(false);
+    if (res.ok) {
+      setCuMsg({ ok: true, text: `Compte « ${cu.pseudo.trim()} » créé. Il peut se connecter dès maintenant.` });
+      setCu({ pseudo: '', fullName: '', email: '', password: '', role: 'analyste' });
+    } else {
+      setCuMsg({ ok: false, text: res.error ?? 'Création impossible' });
+    }
+  }
+
   return (
     <div className="max-w-[1320px] mx-auto">
       <div className="mb-6">
@@ -146,6 +171,83 @@ export function Equipe() {
           deltaLabel="à traiter"
         />
       </div>
+
+      {/* Créer un compte directement (stocké en base partagée) */}
+      <Card className="mb-6">
+        <SectionHeader
+          title="Créer un compte"
+          subtitle="Compte utilisable immédiatement, partagé sur tous les appareils"
+        />
+        <form onSubmit={submitCreateUser} className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div>
+            <label className="text-2xs uppercase tracking-wider text-ink-muted block mb-1.5">Identifiant (pseudo)</label>
+            <input
+              value={cu.pseudo}
+              onChange={(e) => { setCu({ ...cu, pseudo: e.target.value }); setCuMsg(null); }}
+              placeholder="ex : marie.d"
+              className="w-full h-10 px-3 border border-hair hairline rounded-lg bg-white dark:bg-night-surface text-sm text-ink dark:text-night-ink focus:outline-none focus:border-silverlit-red placeholder:text-ink-muted"
+            />
+          </div>
+          <div>
+            <label className="text-2xs uppercase tracking-wider text-ink-muted block mb-1.5">Nom complet</label>
+            <input
+              value={cu.fullName}
+              onChange={(e) => { setCu({ ...cu, fullName: e.target.value }); setCuMsg(null); }}
+              placeholder="Marie Dupont"
+              className="w-full h-10 px-3 border border-hair hairline rounded-lg bg-white dark:bg-night-surface text-sm text-ink dark:text-night-ink focus:outline-none focus:border-silverlit-red placeholder:text-ink-muted"
+            />
+          </div>
+          <div>
+            <label className="text-2xs uppercase tracking-wider text-ink-muted block mb-1.5">Email (optionnel)</label>
+            <input
+              type="email"
+              value={cu.email}
+              onChange={(e) => { setCu({ ...cu, email: e.target.value }); setCuMsg(null); }}
+              placeholder="marie.d@silverlit.fr"
+              className="w-full h-10 px-3 border border-hair hairline rounded-lg bg-white dark:bg-night-surface text-sm text-ink dark:text-night-ink focus:outline-none focus:border-silverlit-red placeholder:text-ink-muted"
+            />
+          </div>
+          <div>
+            <label className="text-2xs uppercase tracking-wider text-ink-muted block mb-1.5">Mot de passe</label>
+            <input
+              type="text"
+              value={cu.password}
+              onChange={(e) => { setCu({ ...cu, password: e.target.value }); setCuMsg(null); }}
+              placeholder="à communiquer à la personne"
+              className="w-full h-10 px-3 border border-hair hairline rounded-lg bg-white dark:bg-night-surface text-sm text-ink dark:text-night-ink focus:outline-none focus:border-silverlit-red placeholder:text-ink-muted"
+            />
+          </div>
+          <div>
+            <label className="text-2xs uppercase tracking-wider text-ink-muted block mb-1.5">Rôle</label>
+            <select
+              value={cu.role}
+              onChange={(e) => setCu({ ...cu, role: e.target.value as Role })}
+              className="w-full h-10 px-3 border border-hair hairline rounded-lg bg-white dark:bg-night-surface text-sm text-ink dark:text-night-ink focus:outline-none focus:border-silverlit-red"
+            >
+              {ROLE_OPTIONS.map((r) => <option key={r} value={r}>{ROLE_LABELS[r]}</option>)}
+            </select>
+          </div>
+          <div className="flex items-end">
+            <button
+              type="submit"
+              disabled={!cu.pseudo.trim() || !cu.fullName.trim() || !cu.password || cuBusy}
+              className="h-10 px-4 rounded-lg bg-silverlit-red hover:bg-silverlit-red-deep text-white text-sm font-medium disabled:opacity-40 inline-flex items-center gap-2 transition-colors"
+            >
+              <UserPlus size={14} />
+              {cuBusy ? 'Création…' : 'Créer le compte'}
+            </button>
+          </div>
+        </form>
+        {cuMsg && (
+          <div className={classNames(
+            'mt-3 flex items-start gap-2 rounded-lg px-3 py-2.5 text-2xs',
+            cuMsg.ok ? 'bg-brand-green/10 text-brand-green' : 'bg-red-50 dark:bg-night-alt text-red-700 dark:text-red-300',
+          )}>
+            {cuMsg.ok ? <Check size={13} className="mt-0.5 shrink-0" /> : <ShieldAlert size={13} className="mt-0.5 shrink-0" />}
+            <span>{cuMsg.text}</span>
+          </div>
+        )}
+      </Card>
 
       {/* Inviter un utilisateur */}
       <Card className="mb-6">

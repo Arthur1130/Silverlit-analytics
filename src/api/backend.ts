@@ -5,6 +5,10 @@
 // detectBackend() choisit automatiquement selon la disponibilité du serveur.
 
 import { api, ApiError, API_URL, getToken, setToken } from './client';
+import {
+  fetchUsersFromServer, createUserOnServer, deleteUserOnServer,
+  updateUserRoleOnServer, verifyLoginOnServer,
+} from './usersApi';
 
 export type Role = 'admin' | 'analyste' | 'distributeur' | 'invite';
 
@@ -68,6 +72,8 @@ export interface AuthBackend {
   resendInvitation(id: string): Promise<InviteResult>;
   updateUserRole(id: string, role: Role): Promise<User>;
   removeUser(id: string): Promise<void>;
+  // Création directe d'un compte (pseudo + mot de passe), stocké en base partagée
+  createUser(input: { pseudo: string; fullName: string; email: string; role: Role; password: string }): Promise<User>;
   verifyInvitation(token: string): Promise<{ email: string; role: Role }>;
   acceptInvitation(
     token: string, pseudo: string, fullName: string, password: string,
@@ -136,6 +142,9 @@ export const apiBackend: AuthBackend = {
   },
   async removeUser(id) {
     await api(`/users/${id}`, { method: 'DELETE' });
+  },
+  async createUser(input) {
+    return createUserOnServer(input);
   },
   async verifyInvitation(token) {
     return api<{ email: string; role: Role }>(
@@ -216,21 +225,27 @@ export const localBackend: AuthBackend = {
   },
   async signIn(pseudo, password) {
     const key = pseudo.trim().toLowerCase();
-    const expected = SEED_CREDENTIALS[key];
-    if (!expected || expected !== password) {
-      throw new Error('Identifiants invalides');
+
+    // 1) Comptes de RÉFÉRENCE (filet de sécurité — toujours dispo, même hors ligne).
+    //    Garantit qu'on ne peut jamais être verrouillé dehors.
+    const seedExpected = SEED_CREDENTIALS[key];
+    if (seedExpected !== undefined) {
+      if (seedExpected !== password) throw new Error('Identifiants invalides');
+      const account = SEED_USERS.find((u) => u.pseudo === key);
+      if (!account) throw new Error('Identifiants invalides');
+      const signed = { ...account, lastLogin: new Date().toISOString() };
+      save(LK.user, signed);
+      return signed;
     }
-    const account = getUsers().find((u) => u.pseudo === key);
-    if (!account) {
-      // Safety net : si le profil est introuvable malgré des credentials
-      // valides (cas pathologique : SEED_USERS et SEED_CREDENTIALS désynchronisés),
-      // on refuse plutôt que de logguer comme admin par défaut.
-      throw new Error('Identifiants invalides');
+
+    // 2) Comptes créés depuis le site (vérifiés en BASE en ligne).
+    const dbUser = await verifyLoginOnServer(key, password);
+    if (dbUser) {
+      save(LK.user, dbUser);
+      return dbUser;
     }
-    const signed = { ...account, lastLogin: new Date().toISOString() };
-    save(LK.user, signed);
-    save(LK.users, getUsers().map((u) => (u.id === signed.id ? signed : u)));
-    return signed;
+
+    throw new Error('Identifiants invalides');
   },
   signOut() {
     try {
@@ -253,7 +268,11 @@ export const localBackend: AuthBackend = {
     save(LK.demandes, [demande, ...load<DemandeCompte[]>(LK.demandes, [])].slice(0, 50));
   },
   async listUsers() {
-    return getUsers();
+    // Comptes de référence + comptes créés en base (dédupliqués par pseudo)
+    const dbUsers = (await fetchUsersFromServer()) ?? [];
+    const seedPseudos = new Set(SEED_USERS.map((u) => u.pseudo));
+    const extra = dbUsers.filter((u) => !seedPseudos.has(u.pseudo));
+    return [...SEED_USERS, ...extra];
   },
   async listInvitations() {
     return load<LocalInvitation[]>(LK.invitations, []);
@@ -314,30 +333,34 @@ export const localBackend: AuthBackend = {
     const link = `${window.location.origin}/invitation?token=${found.token}`;
     return { invitation: found, emailSent: false, link };
   },
-  async updateUserRole(id, role) {
-    const users = getUsers();
-    const target = users.find((u) => u.id === id);
-    if (!target) throw new Error('Utilisateur introuvable');
-    if (target.role === 'admin' && role !== 'admin'
-        && users.filter((u) => u.role === 'admin').length <= 1) {
-      throw new Error('Au moins un administrateur doit rester actif');
+  // Création directe d'un compte depuis le site → stocké en BASE partagée
+  async createUser(input) {
+    const pseudo = input.pseudo.trim().toLowerCase();
+    if (SEED_CREDENTIALS[pseudo] !== undefined) {
+      throw new Error('Ce pseudo est réservé à un compte de référence');
     }
-    const next = users.map((u) => (u.id === id ? { ...u, role } : u));
-    save(LK.users, next);
-    const me = load<User | null>(LK.user, null);
-    if (me && me.id === id) save(LK.user, { ...me, role });
+    if (!input.password || input.password.length < 4) {
+      throw new Error('Mot de passe trop court (4 caractères minimum)');
+    }
+    return createUserOnServer({ ...input, pseudo });
+  },
+  async updateUserRole(id, role) {
+    // Les comptes de référence ne sont pas modifiables ici
+    if (SEED_USERS.some((u) => u.id === id)) {
+      throw new Error('Le rôle d’un compte de référence ne se modifie pas ici');
+    }
+    await updateUserRoleOnServer(id, role);
+    const target = (await this.listUsers()).find((u) => u.id === id);
+    if (!target) throw new Error('Utilisateur introuvable');
     return { ...target, role };
   },
   async removeUser(id) {
-    const users = getUsers();
     const me = load<User | null>(LK.user, null);
     if (id === me?.id) throw new Error('Vous ne pouvez pas supprimer votre propre compte');
-    const target = users.find((u) => u.id === id);
-    if (!target) throw new Error('Utilisateur introuvable');
-    if (target.role === 'admin' && users.filter((u) => u.role === 'admin').length <= 1) {
-      throw new Error('Au moins un administrateur doit rester actif');
+    if (SEED_USERS.some((u) => u.id === id)) {
+      throw new Error('Un compte de référence ne se supprime pas ici');
     }
-    save(LK.users, users.filter((u) => u.id !== id));
+    await deleteUserOnServer(id);
   },
   async verifyInvitation(token) {
     const list = load<LocalInvitation[]>(LK.invitations, []);

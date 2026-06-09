@@ -55,6 +55,7 @@ interface AuthCtx {
   resendInvitation: (id: string) => Promise<Result & { link?: string; emailSent?: boolean }>;
   updateUserRole: (id: string, role: Role) => Promise<Result>;
   removeUser: (id: string) => Promise<Result>;
+  createUser: (input: { pseudo: string; fullName: string; email: string; role: Role; password: string }) => Promise<Result>;
 }
 
 const Ctx = createContext<AuthCtx | null>(null);
@@ -207,6 +208,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [backend]);
 
+  const createUser = useCallback(async (
+    input: { pseudo: string; fullName: string; email: string; role: Role; password: string },
+  ): Promise<Result> => {
+    if (!backend) return { ok: false, error: 'Initialisation en cours…' };
+    try {
+      const u = await backend.createUser(input);
+      setUsers((cur) => [...cur, u]);
+      return { ok: true };
+    } catch (e) {
+      return { ok: false, error: errMessage(e) };
+    }
+  }, [backend]);
+
   const value: AuthCtx = {
     user,
     loading,
@@ -226,6 +240,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     resendInvitation,
     updateUserRole,
     removeUser,
+    createUser,
   };
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
