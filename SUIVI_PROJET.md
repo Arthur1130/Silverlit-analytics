@@ -61,26 +61,29 @@ Marque de l'outil : **ANIZIA**. Client final : Silverlit (contact : Chris).
 - Nettoyage complet des chiffres fabriqués (alertes, gouvernance, par-magasin, deltas, labels)
 - **Base de données en ligne** : imports partagés sur tous les appareils
 - **Création de comptes depuis le site** (page Équipe → Créer un compte, base partagée, mots de passe hachés)
+- ⭐ **Comparatif année sur année (N vs N-1) par semaine** : sélecteur `compareYoY()`
+  + composant `src/components/YoYComparison.tsx` sur Pilotage. 2 courbes superposées
+  sur 52 semaines, KPIs cumulés à une **semaine de référence comparable**, règle
+  anti-faux-chiffre respectée (trous jamais comblés, évolution « — » sans base N-1).
 
 ## 9. CE QUI RESTE À FAIRE ⏳
 
-### ⭐ PRIORITÉ DEMANDÉE PAR ARTHUR — Comparatif année sur année (N vs N-1) par semaine
-Construire un **vrai comparatif N / N-1 au niveau global**, semaine par semaine
-(pas le « glissant » actuel de `previousPeriodVentes`).
-- **Besoin** : pour chaque numéro de semaine (S1…S52), comparer **2026 (N)** vs **2025 (N-1)**
-  — même numéro de semaine, cette année vs l'an dernier. Vue « glissante à l'année ».
-- **À construire** :
-  1. Nouveau sélecteur dans `src/utils/selectors.ts`, ex `compareYoY(ventes)` :
-     - N = année max présente dans les données ; N1 = N − 1.
-     - Retourne, pour chaque semaine 1..52 : `{ semaine, caN, caN1, qteN, qteN1 }`.
-     - + totaux globaux : ΣcaN, ΣcaN1, évolution % ; idem quantités.
-  2. Section sur **Pilotage** (`src/pages/Pilotage.tsx`) :
-     - Graphique avec **2 courbes superposées** (N et N-1) sur les 52 semaines (Recharts, 2 `<Area>`/`<Line>`).
-     - KPIs globaux : **CA N vs CA N-1 + évolution %**, **Qté N vs N-1 + évolution %**.
-     - N'afficher l'évolution que si N-1 a des données (sinon « — », cf. règle anti-faux-chiffre).
-  3. Tester avec des semaines correspondantes (importer 2026-Sx ET 2025-Sx, mêmes numéros).
-- **Note data** : aujourd'hui en base il y a 2026-S1 + des semaines 2025 éparses (S28, S35…).
-  Le comparatif ne s'affiche que là où N et N-1 ont la **même** semaine. C'est normal.
+### ✅ Comparatif année sur année (N vs N-1) par semaine — LIVRÉ
+- **Sélecteur** `compareYoY(ventes, refWeek?)` dans `src/utils/selectors.ts`
+  (+ `scopeVentes()` = périmètre distributeur/gamme **sans** la période).
+  - N = année max présente ; N1 = N − 1. Pour chaque semaine 1..52 :
+    `{ semaine, caN, caN1, qteN, qteN1 }` avec `null` (jamais 0) si pas de donnée.
+  - `reference` = cumul **S1 → semaine de référence**, calculé **uniquement** sur les
+    semaines présentes en N ET N-1 ; la semaine de réf. est **bornée** à ces semaines
+    comparables (pas de cumul fantôme). Évolution % = `null` si pas de base N-1.
+- **UI** `src/components/YoYComparison.tsx` (affiché sur Pilotage) :
+  2 courbes Recharts sur 52 semaines (**sans `connectNulls`** → trous honnêtes),
+  tuiles CA/Qté cumulées + évolution, sélecteur de semaine de référence (comparables),
+  toggle CA/Quantités, ligne de référence, états vides honnêtes (N-1 absent / aucune
+  semaine commune).
+- **Reste data (prod)** : il faut importer des semaines **2025 (N-1) réelles** pour que la
+  comparaison s'affiche en ligne (cf. Track C). Le comparatif n'apparaît que là où N et N-1
+  partagent une **même** semaine — c'est voulu.
 
 ### Track B — Export pixel-près
 1. **Track B — Export pixel-près** : remplir directement le gabarit `TB Vierge.xlsx`

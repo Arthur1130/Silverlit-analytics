@@ -15,6 +15,7 @@ import {
   caByDistributeur, caByGamme, topProduits,
 } from '../utils/selectors';
 import { weekShort } from '../utils/format';
+import { YoYComparison } from '../components/YoYComparison';
 import { PRODUITS } from '../data';
 
 export function Pilotage() {
@@ -86,6 +87,10 @@ export function Pilotage() {
             icon={<Store size={14} />}
           />
         </div>
+      </div>
+
+      <div className="mb-6">
+        <YoYComparison />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
