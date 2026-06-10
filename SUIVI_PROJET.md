@@ -63,6 +63,26 @@ Marque de l'outil : **ANIZIA**. Client final : Silverlit (contact : Chris).
 - **Création de comptes depuis le site** (page Équipe → Créer un compte, base partagée, mots de passe hachés)
 
 ## 9. CE QUI RESTE À FAIRE ⏳
+
+### ⭐ PRIORITÉ DEMANDÉE PAR ARTHUR — Comparatif année sur année (N vs N-1) par semaine
+Construire un **vrai comparatif N / N-1 au niveau global**, semaine par semaine
+(pas le « glissant » actuel de `previousPeriodVentes`).
+- **Besoin** : pour chaque numéro de semaine (S1…S52), comparer **2026 (N)** vs **2025 (N-1)**
+  — même numéro de semaine, cette année vs l'an dernier. Vue « glissante à l'année ».
+- **À construire** :
+  1. Nouveau sélecteur dans `src/utils/selectors.ts`, ex `compareYoY(ventes)` :
+     - N = année max présente dans les données ; N1 = N − 1.
+     - Retourne, pour chaque semaine 1..52 : `{ semaine, caN, caN1, qteN, qteN1 }`.
+     - + totaux globaux : ΣcaN, ΣcaN1, évolution % ; idem quantités.
+  2. Section sur **Pilotage** (`src/pages/Pilotage.tsx`) :
+     - Graphique avec **2 courbes superposées** (N et N-1) sur les 52 semaines (Recharts, 2 `<Area>`/`<Line>`).
+     - KPIs globaux : **CA N vs CA N-1 + évolution %**, **Qté N vs N-1 + évolution %**.
+     - N'afficher l'évolution que si N-1 a des données (sinon « — », cf. règle anti-faux-chiffre).
+  3. Tester avec des semaines correspondantes (importer 2026-Sx ET 2025-Sx, mêmes numéros).
+- **Note data** : aujourd'hui en base il y a 2026-S1 + des semaines 2025 éparses (S28, S35…).
+  Le comparatif ne s'affiche que là où N et N-1 ont la **même** semaine. C'est normal.
+
+### Track B — Export pixel-près
 1. **Track B — Export pixel-près** : remplir directement le gabarit `TB Vierge.xlsx`
    (colonnes LIVRE/TAUX REVENTE, formules, mise en forme) au lieu de la structure actuelle.
 2. **Track C — Mail à Chris** : demander les **fichiers hebdo 2025** pour avoir le N-1
