@@ -13,8 +13,30 @@
 // La vérification du mot de passe (connexion) est dans /api/login.
 
 import { sql } from '@vercel/postgres';
-import { pbkdf2Sync, randomBytes } from 'node:crypto';
-import { getAuth } from './_auth';
+import { pbkdf2Sync, randomBytes, createHmac, timingSafeEqual } from 'node:crypto';
+
+// Vérification du jeton (HMAC) EN LOCAL — pas d'import externe.
+const AUTH_SECRET = process.env.AUTH_SECRET || 'anizia-silverlit-server-secret-v1-2026';
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function hasAuth(req: any): boolean {
+  const h = req?.headers?.authorization ?? req?.headers?.Authorization ?? '';
+  const m = String(h).match(/^Bearer\s+(.+)$/i);
+  if (!m) return false;
+  const token = m[1];
+  const dot = token.indexOf('.');
+  if (dot < 0) return false;
+  const data = token.slice(0, dot);
+  const expected = createHmac('sha256', AUTH_SECRET).update(data).digest('base64url');
+  const a = Buffer.from(token.slice(dot + 1));
+  const b = Buffer.from(expected);
+  if (a.length !== b.length || !timingSafeEqual(a, b)) return false;
+  try {
+    const body = JSON.parse(Buffer.from(data, 'base64url').toString());
+    return typeof body.exp === 'number' && body.exp >= Date.now();
+  } catch {
+    return false;
+  }
+}
 
 export function hashPassword(password: string): string {
   const salt = randomBytes(16).toString('hex');
@@ -49,7 +71,7 @@ export default async function handler(req: any, res: any) {
 
     // Lecture ouverte ; créer/modifier/supprimer un compte exige un jeton valide.
     const isWrite = req.method === 'POST' || req.method === 'PATCH' || req.method === 'DELETE';
-    if (isWrite && !getAuth(req)) {
+    if (isWrite && !hasAuth(req)) {
       return res.status(401).json({ error: 'Authentification requise' });
     }
 

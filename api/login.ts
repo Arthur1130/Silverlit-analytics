@@ -8,8 +8,17 @@
 // comme filet de sécurité ; cette route vérifie les comptes créés en base.
 
 import { sql } from '@vercel/postgres';
-import { pbkdf2Sync, timingSafeEqual } from 'node:crypto';
-import { signToken } from './_auth';
+import { pbkdf2Sync, timingSafeEqual, createHmac } from 'node:crypto';
+
+// Jeton signé (HMAC) — défini EN LOCAL (pas d'import externe) pour garantir que
+// la fonction serverless se charge sans dépendance qui pourrait manquer au build.
+const AUTH_SECRET = process.env.AUTH_SECRET || 'anizia-silverlit-server-secret-v1-2026';
+function signToken(payload: Record<string, unknown>): string {
+  const body = { ...payload, exp: Date.now() + 60 * 60 * 24 * 1000 };
+  const data = Buffer.from(JSON.stringify(body)).toString('base64url');
+  const sig = createHmac('sha256', AUTH_SECRET).update(data).digest('base64url');
+  return `${data}.${sig}`;
+}
 
 // Comptes de RÉFÉRENCE (filet de sécurité) — vérifiés AVANT la base, donc
 // fonctionnels même si Postgres est indisponible, et JAMAIS exposés dans le
