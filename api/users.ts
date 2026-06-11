@@ -14,6 +14,7 @@
 
 import { sql } from '@vercel/postgres';
 import { pbkdf2Sync, randomBytes } from 'node:crypto';
+import { getAuth } from './_auth';
 
 export function hashPassword(password: string): string {
   const salt = randomBytes(16).toString('hex');
@@ -45,6 +46,12 @@ function toUser(r: any) {
 export default async function handler(req: any, res: any) {
   try {
     await ensureTable();
+
+    // Lecture ouverte ; créer/modifier/supprimer un compte exige un jeton valide.
+    const isWrite = req.method === 'POST' || req.method === 'PATCH' || req.method === 'DELETE';
+    if (isWrite && !getAuth(req)) {
+      return res.status(401).json({ error: 'Authentification requise' });
+    }
 
     if (req.method === 'GET') {
       const { rows } = await sql`SELECT id, pseudo, full_name, email, role, created_at

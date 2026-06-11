@@ -9,6 +9,7 @@ import {
   fetchUsersFromServer, createUserOnServer, deleteUserOnServer,
   updateUserRoleOnServer, verifyLoginOnServer,
 } from './usersApi';
+import { setToken as setAuthToken } from './authToken';
 
 export type Role = 'admin' | 'analyste' | 'distributeur' | 'invite';
 
@@ -175,13 +176,19 @@ interface LocalInvitation extends Invitation {
   token: string;
 }
 
-// Compte pré-configuré du mode local — utilisable tel quel sur le site déployé.
-// Le mot de passe peut être modifié ici avant déploiement.
-const SEED_CREDENTIALS: Record<string, string> = {
-  arthur1130: 'arthur1234',
-  pls1406: 'Fontaine28',
-  'silverlit.all': 'transverse.silverlit',
-};
+// Comptes de référence. En PRODUCTION, ce dictionnaire est VIDE : la connexion
+// est vérifiée côté serveur (/api/login) et les mots de passe ne sont donc PLUS
+// présents dans le bundle navigateur. En développement (pas de serverless local),
+// on garde les identifiants pour pouvoir se connecter hors ligne.
+// `import.meta.env.DEV` vaut false au build de prod → ce bloc (et ses mots de
+// passe) est éliminé du bundle par tree-shaking.
+const SEED_CREDENTIALS: Record<string, string> = import.meta.env.DEV
+  ? {
+      arthur1130: 'arthur1234',
+      pls1406: 'Fontaine28',
+      'silverlit.all': 'transverse.silverlit',
+    }
+  : {};
 
 const SEED_USERS: User[] = [
   { id: 'u-arthur', pseudo: 'arthur1130', fullName: 'Arthur Leroy Sahli', email: 'arthur1130@silverlit.fr', role: 'admin', lastLogin: '2026-05-14T08:10:00Z', createdAt: '2026-01-06T09:00:00Z' },
@@ -250,6 +257,7 @@ export const localBackend: AuthBackend = {
   signOut() {
     try {
       localStorage.removeItem(LK.user);
+      setAuthToken(null);
     } catch {
       /* no-op */
     }
@@ -336,7 +344,7 @@ export const localBackend: AuthBackend = {
   // Création directe d'un compte depuis le site → stocké en BASE partagée
   async createUser(input) {
     const pseudo = input.pseudo.trim().toLowerCase();
-    if (SEED_CREDENTIALS[pseudo] !== undefined) {
+    if (SEED_USERS.some((u) => u.pseudo === pseudo)) {
       throw new Error('Ce pseudo est réservé à un compte de référence');
     }
     if (!input.password || input.password.length < 4) {

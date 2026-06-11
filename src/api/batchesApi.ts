@@ -5,6 +5,7 @@
 // (le site ne casse jamais).
 
 import type { ImportBatch } from '../data/importBatches';
+import { authHeaders } from './authToken';
 
 const BASE = '/api/batches';
 
@@ -25,7 +26,7 @@ export async function pushBatchToServer(batch: ImportBatch): Promise<boolean> {
   try {
     const res = await fetch(BASE, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify(batch),
     });
     return res.ok;
@@ -37,7 +38,7 @@ export async function pushBatchToServer(batch: ImportBatch): Promise<boolean> {
 /** Supprime un lot en base. */
 export async function deleteBatchOnServer(id: string): Promise<boolean> {
   try {
-    const res = await fetch(`${BASE}?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+    const res = await fetch(`${BASE}?id=${encodeURIComponent(id)}`, { method: 'DELETE', headers: authHeaders() });
     return res.ok;
   } catch {
     return false;

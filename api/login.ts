@@ -9,6 +9,26 @@
 
 import { sql } from '@vercel/postgres';
 import { pbkdf2Sync, timingSafeEqual } from 'node:crypto';
+import { signToken } from './_auth';
+
+// Comptes de RÉFÉRENCE (filet de sécurité) — vérifiés AVANT la base, donc
+// fonctionnels même si Postgres est indisponible, et JAMAIS exposés dans le
+// bundle navigateur (ce fichier est serveur uniquement). Les mots de passe
+// peuvent être surchargés par des variables d'environnement Vercel.
+const SEED: Record<string, { password: string; user: Record<string, unknown> }> = {
+  arthur1130: {
+    password: process.env.SEED_PWD_ARTHUR || 'arthur1234',
+    user: { id: 'u-arthur', pseudo: 'arthur1130', fullName: 'Arthur Leroy Sahli', email: 'arthur1130@silverlit.fr', role: 'admin' },
+  },
+  pls1406: {
+    password: process.env.SEED_PWD_PLS || 'Fontaine28',
+    user: { id: 'u-philippe', pseudo: 'pls1406', fullName: 'Philippe Leroy Sahli', email: 'philippe.ls@silverlit.fr', role: 'admin' },
+  },
+  'silverlit.all': {
+    password: process.env.SEED_PWD_SILVERLIT || 'transverse.silverlit',
+    user: { id: 'u-silverlit', pseudo: 'silverlit.all', fullName: 'Silverlit France', email: 'contact@silverlit.fr', role: 'admin' },
+  },
+};
 
 function verifyPassword(password: string, stored: string): boolean {
   const [salt, hash] = String(stored).split(':');
@@ -30,6 +50,19 @@ export default async function handler(req: any, res: any) {
     const password = String(b?.password ?? '');
     if (!pseudo || !password) return res.status(400).json({ error: 'identifiants requis' });
 
+    // 1) Comptes de référence (filet de sécurité), vérifiés AVANT toute requête
+    //    base — donc fonctionnels même si Postgres est indisponible.
+    const seed = SEED[pseudo];
+    if (seed) {
+      if (seed.password !== password) return res.status(401).json({ error: 'Identifiants invalides' });
+      // Le jeton ne doit JAMAIS bloquer la connexion d'un compte de référence :
+      // en cas d'imprévu, on connecte sans jeton (lecture OK, écritures à retenter).
+      let token: string | undefined;
+      try { token = signToken({ sub: seed.user.id, role: seed.user.role }); } catch { /* connexion sans jeton */ }
+      return res.status(200).json({ ...seed.user, lastLogin: new Date().toISOString(), token });
+    }
+
+    // 2) Comptes créés en base.
     const { rows } = await sql`SELECT id, pseudo, full_name, email, role, password_hash
                                FROM app_users WHERE pseudo = ${pseudo}`;
     if (rows.length === 0) return res.status(401).json({ error: 'Identifiants invalides' });
@@ -37,9 +70,10 @@ export default async function handler(req: any, res: any) {
     if (!verifyPassword(password, u.password_hash)) {
       return res.status(401).json({ error: 'Identifiants invalides' });
     }
+    const token = signToken({ sub: u.id, role: u.role });
     return res.status(200).json({
       id: u.id, pseudo: u.pseudo, fullName: u.full_name, email: u.email,
-      role: u.role, lastLogin: new Date().toISOString(), createdAt: u.created_at,
+      role: u.role, lastLogin: new Date().toISOString(), createdAt: u.created_at, token,
     });
   } catch (e) {
     // Si la base n'est pas joignable, on renvoie 401 (le front gère le filet de secours).

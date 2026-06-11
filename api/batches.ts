@@ -17,6 +17,7 @@
 // front bascule automatiquement sur le stockage local — le site continue.
 
 import { sql } from '@vercel/postgres';
+import { getAuth } from './_auth';
 
 async function ensureTable() {
   await sql`CREATE TABLE IF NOT EXISTS import_batches (
@@ -30,6 +31,12 @@ async function ensureTable() {
 export default async function handler(req: any, res: any) {
   try {
     await ensureTable();
+
+    // Lecture ouverte (hydratation au démarrage) ; écritures protégées par jeton.
+    const isWrite = req.method === 'POST' || req.method === 'PUT' || req.method === 'DELETE';
+    if (isWrite && !getAuth(req)) {
+      return res.status(401).json({ error: 'Authentification requise' });
+    }
 
     if (req.method === 'GET') {
       const { rows } = await sql`SELECT data FROM import_batches ORDER BY updated_at ASC`;

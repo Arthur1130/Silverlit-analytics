@@ -3,6 +3,7 @@
 // et le front retombe sur les comptes de référence (filet de sécurité).
 
 import type { User, Role } from './backend';
+import { setToken, authHeaders } from './authToken';
 
 export interface CreateUserInput {
   pseudo: string;
@@ -28,7 +29,7 @@ export async function fetchUsersFromServer(): Promise<User[] | null> {
 export async function createUserOnServer(input: CreateUserInput): Promise<User> {
   const res = await fetch('/api/users', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: authHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(input),
   });
   if (!res.ok) {
@@ -41,7 +42,7 @@ export async function createUserOnServer(input: CreateUserInput): Promise<User> 
 /** Supprime un compte en base. */
 export async function deleteUserOnServer(id: string): Promise<boolean> {
   try {
-    const res = await fetch(`/api/users?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+    const res = await fetch(`/api/users?id=${encodeURIComponent(id)}`, { method: 'DELETE', headers: authHeaders() });
     return res.ok;
   } catch {
     return false;
@@ -53,7 +54,7 @@ export async function updateUserRoleOnServer(id: string, role: Role): Promise<bo
   try {
     const res = await fetch('/api/users', {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
+      headers: authHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({ id, role }),
     });
     return res.ok;
@@ -71,7 +72,11 @@ export async function verifyLoginOnServer(pseudo: string, password: string): Pro
       body: JSON.stringify({ pseudo, password }),
     });
     if (!res.ok) return null;
-    return res.json();
+    const body = await res.json();
+    // Stocke le jeton (autorise ensuite les écritures) et le retire de l'objet user.
+    if (body && typeof body.token === 'string') setToken(body.token);
+    if (body && 'token' in body) delete body.token;
+    return body as User;
   } catch {
     return null;
   }
