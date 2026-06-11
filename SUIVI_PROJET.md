@@ -65,6 +65,17 @@ Marque de l'outil : **ANIZIA**. Client final : Silverlit (contact : Chris).
   + composant `src/components/YoYComparison.tsx` sur Pilotage. 2 courbes superposées
   sur 52 semaines, KPIs cumulés à une **semaine de référence comparable**, règle
   anti-faux-chiffre respectée (trous jamais comblés, évolution « — » sans base N-1).
+- 🧹 **Audit de propreté (multi-agents) + nettoyage** : code mort supprimé (moteur
+  d'import fantôme `importFormats.ts`, validation orpheline, logos inutilisés,
+  générateurs aléatoires dormants dans `distributors.ts`). Faux chiffres corrigés :
+  bug EAN « zéro de tête » (produits vendus affichés à 0 → `findProduit` côté
+  Produits/ProduitDetail), deltas « +100 % » fabriqués du chatbot (`qa.ts`) et de
+  l'infographie, score qualité incohérent. Build vert, vérifié en preview.
+- 🔒 **Sécurité de l'API** : jeton signé HMAC (`api/_auth.ts`) émis par `/api/login`,
+  EXIGÉ sur les écritures de `/api/batches` et `/api/users` → un anonyme ne peut plus
+  créer d'admin ni écraser/supprimer des ventes. Comptes de référence vérifiés CÔTÉ
+  SERVEUR → mots de passe retirés du bundle navigateur en prod (`import.meta.env.DEV`).
+  Client : jeton dans `src/api/authToken.ts`, joint aux écritures.
 
 ## 9. CE QUI RESTE À FAIRE ⏳
 
@@ -94,6 +105,17 @@ Marque de l'outil : **ANIZIA**. Client final : Silverlit (contact : Chris).
 3. **Autres distributeurs** : ajouter leurs formats dans `importEngine.ts` quand leurs fichiers arrivent
    (référentiel des 11 enseignes dans `src/data/distributors.ts`).
 4. **5 réfs JouéClub hors grille** : à compléter dans la grille de prix pour fiabiliser le CA.
+
+### Track D — Sécurité (durcissement recommandé)
+1. **Définir `AUTH_SECRET`** sur Vercel (chaîne aléatoire longue) pour remplacer le secret
+   de signature par défaut intégré. Optionnel : `SEED_PWD_ARTHUR` / `SEED_PWD_PLS` /
+   `SEED_PWD_SILVERLIT` pour changer les mots de passe de référence sans toucher au code.
+2. **Issue H** (non bloquante) : l'acceptation d'invitation gère encore le mot de passe
+   en clair en mode local → router vers `createUserOnServer` (hachage pbkdf2) comme `createUser`.
+3. **Optionnel** : protéger aussi la LECTURE de `/api/batches` et `/api/users` (aujourd'hui
+   ouverte pour l'hydratation au démarrage, avant connexion).
+4. **`api/` hors tsconfig** : les endpoints serverless ne sont pas vérifiés par `npm run build`
+   (une erreur de type y passe). Ajouter un tsconfig couvrant `api/` un jour.
 
 ## 10. Retour client (Chris) — priorités
 - **P1 (fiabilité données)** : calcul OK + multi-semaines OK. Reste « N et N-1 » → bloqué sur fichiers 2025.
