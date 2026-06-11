@@ -75,6 +75,23 @@ export function Import() {
   }
 
   function importAll() {
+    // Garde anti-doublon : même distributeur + année + semaine déjà en base
+    // (ou en double dans la sélection) → on demande confirmation explicite.
+    const seen = new Set(batches.map((b) => `${b.distributeurId}|${b.annee}|${b.semaine}`));
+    const dups: string[] = [];
+    for (const p of pending) {
+      const k = `${p.distributeurId}|${p.annee}|${p.semaine}`;
+      if (seen.has(k)) dups.push(`${p.sourceName || p.fileName} → ${p.annee}·S${p.semaine}`);
+      seen.add(k);
+    }
+    if (dups.length > 0) {
+      const ok = window.confirm(
+        `Attention : ${dups.length} fichier(s) ciblent une semaine DÉJÀ présente pour ce distributeur :\n\n` +
+        dups.map((d) => `• ${d}`).join('\n') +
+        `\n\nImporter quand même créera un doublon (chiffres comptés deux fois). Continuer ?`,
+      );
+      if (!ok) return;
+    }
     for (const p of pending) {
       const dist = DISTRIBUTEURS.find((d) => d.id === p.distributeurId);
       const rows: Vente[] = p.parse.rows.map((r) => ({

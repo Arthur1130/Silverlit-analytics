@@ -113,9 +113,43 @@ export function getFormat(id: string): ImportFormatDef | undefined {
   return FORMATS.find((f) => f.id === id);
 }
 
-function detectWeek(fileName: string): number | undefined {
-  const m = fileName.match(/semaine\s*(\d{1,2})/i) || fileName.match(/[_-](\d{1,2})[_-]SILVERLIT/i);
-  return m ? parseInt(m[1], 10) : undefined;
+// Détection du numéro de semaine depuis le nom de fichier.
+// Pièges réels gérés :
+//  - le libellé natif King Jouet « SemS-1 » signifie « semaine S-1 » (relative),
+//    PAS « semaine 1 » → on le retire avant toute détection ;
+//  - « hebdo_2026-03_SILVERLIT » (JouéClub) : 03 est un numéro de MOIS, jamais
+//    une semaine → aucun pattern ne doit le matcher ;
+//  - suffixes de copie « 38 (2).txt » → 38.
+function clampWeek(s: string): number | undefined {
+  const n = parseInt(s, 10);
+  return n >= 1 && n <= 53 ? n : undefined;
+}
+
+export function detectWeek(fileName: string): number | undefined {
+  const base = fileName.replace(/\.(csv|tsv|txt|xlsx|xlsm|xls)$/i, '').replace(/sems-1\b/gi, ' ').trim();
+  // 1. « SEMAINE 27 » explicite (convention de nommage interne)
+  let m = base.match(/semaine\s*(\d{1,2})/i);
+  if (m) return clampWeek(m[1]);
+  // 2. « SemS-41 » / « Sem 41 » (numéro DANS le libellé semaine, S-1 déjà exclu)
+  m = base.match(/sem\s*s?-?\s*(\d{1,2})\b/i);
+  if (m) return clampWeek(m[1]);
+  // 3. « s42 » isolé
+  m = base.match(/(?:^|[\s_-])s(\d{1,2})(?:\s*\(\d+\))?$/i);
+  if (m) return clampWeek(m[1]);
+  // 4. nombre isolé en fin de nom : « … 27 », « … 38 (2) »
+  m = base.match(/(?:^|[\s_-])(\d{1,2})(?:\s*\(\d+\))?$/);
+  if (m) return clampWeek(m[1]);
+  return undefined;
+}
+
+// Détection de l'année depuis le nom de fichier (« hebdo_2026-01 », « ANNEE 2025 »…).
+export function detectYear(fileName: string): number | undefined {
+  // Frontières numériques plutôt que \b : « hebdo_2026-03 » doit matcher
+  // (underscore = caractère de mot), « H202616 » ne doit pas.
+  const m = fileName.match(/(?<!\d)(20\d{2})(?!\d)/);
+  if (!m) return undefined;
+  const y = parseInt(m[1], 10);
+  return y >= 2020 && y <= 2035 ? y : undefined;
 }
 
 // ---- Lecture brute selon le format ----
@@ -216,7 +250,7 @@ export async function parseAndValorize(file: File, formatId: string): Promise<Pa
     refsCount: out.length,
     unpricedRefs,
     unpricedQte: Math.round(unpricedQte),
-    detectedAnnee: 2026,
+    detectedAnnee: detectYear(file.name) ?? new Date().getFullYear(),
     detectedSemaine: detectWeek(file.name),
     warnings,
   };

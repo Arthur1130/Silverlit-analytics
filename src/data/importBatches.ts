@@ -16,6 +16,7 @@
 
 import type { Vente } from '../types';
 import { SEED_VENTES } from './realSales';
+import { DISTRIBUTEURS } from './distributors';
 import { fetchBatchesFromServer, pushBatchToServer, deleteBatchOnServer } from '../api/batchesApi';
 
 export interface ImportBatch {
@@ -35,6 +36,39 @@ export interface ImportBatch {
 
 const STORE_KEY = 'silverlit.import.batches.v1';
 const INIT_KEY = 'silverlit.import.batches.initialized.v1';
+// Ids des lots dont la présence en base en ligne a été CONFIRMÉE au moins une
+// fois depuis cet appareil. Sert à distinguer, au boot, un lot local absent du
+// serveur : jamais synchronisé → import hors-ligne à migrer ; déjà synchronisé
+// → supprimé depuis un autre appareil, NE PAS le ressusciter en le re-poussant.
+const SYNCED_KEY = 'silverlit.import.batches.synced.v1';
+
+function readSyncedIds(): Set<string> {
+  if (typeof window === 'undefined') return new Set();
+  try {
+    const raw = window.localStorage.getItem(SYNCED_KEY);
+    const arr = raw ? (JSON.parse(raw) as string[]) : [];
+    return new Set(Array.isArray(arr) ? arr : []);
+  } catch {
+    return new Set();
+  }
+}
+
+function writeSyncedIds(ids: Set<string>): void {
+  if (typeof window === 'undefined') return;
+  try {
+    window.localStorage.setItem(SYNCED_KEY, JSON.stringify([...ids]));
+  } catch {
+    /* no-op */
+  }
+}
+
+function markSynced(id: string): void {
+  const ids = readSyncedIds();
+  if (!ids.has(id)) {
+    ids.add(id);
+    writeSyncedIds(ids);
+  }
+}
 
 // ---- Calcul des stats d'un lot ----
 export function computeBatchStats(rows: Vente[]): { totalQte: number; totalCa: number; refsCount: number } {
@@ -147,18 +181,28 @@ export async function hydrateFromServer(): Promise<void> {
   }
   serverActive = true;
   const serverIds = new Set(server.map((b) => b.id));
-  // Migration : pousser vers la base les lots locaux qu'elle n'a pas encore
-  const localOnly = cache.filter((b) => !serverIds.has(b.id));
+  const synced = readSyncedIds();
+  // Lots locaux absents du serveur :
+  //  - jamais synchronisés → imports faits hors-ligne, on les MIGRE vers la base
+  //  - déjà synchronisés   → supprimés depuis un autre appareil, on les LAISSE
+  //    morts (les re-pousser ressusciterait des lots supprimés ailleurs)
+  const localOnly = cache.filter((b) => !serverIds.has(b.id) && !synced.has(b.id));
   for (const b of localOnly) {
-    await pushBatchToServer(b);
+    if (await pushBatchToServer(b)) markSynced(b.id);
   }
   let merged = [...server, ...localOnly];
   // Amorçage : si tout est vide, on installe le seed de référence
   if (merged.length === 0) {
     const seed = buildSeedBatches();
-    for (const b of seed) await pushBatchToServer(b);
+    for (const b of seed) {
+      if (await pushBatchToServer(b)) markSynced(b.id);
+    }
     merged = seed;
   }
+  // Tout ce qui vient du serveur est, par définition, synchronisé.
+  const allSynced = readSyncedIds();
+  for (const b of server) allSynced.add(b.id);
+  writeSyncedIds(allSynced);
   cache = merged;
   writeStore(cache);
 }
@@ -176,12 +220,39 @@ export function getBatch(id: string): ImportBatch | undefined {
 export function addBatch(batch: ImportBatch): void {
   cache = [...cache, batch];
   writeStore(cache);
-  if (serverActive) void pushBatchToServer(batch);
+  if (serverActive) {
+    void pushBatchToServer(batch).then((ok) => {
+      if (ok) markSynced(batch.id);
+    });
+  }
 }
 
-/** Met à jour les métadonnées d'un lot (local + base en ligne). */
+// Les LIGNES de vente portent elles-mêmes année/semaine/distributeur, et c'est
+// ELLES que lit le dashboard (getAllVentes). Toute modification des métadonnées
+// d'un lot DOIT donc être propagée à ses lignes — sinon la page Import affiche
+// « 2025·S28 » pendant que le dashboard compte toujours les ventes en 2026·S1
+// (bug historique : 15 lots édités jamais répercutés sur les courbes).
+function syncRowsWithMeta(b: ImportBatch): ImportBatch {
+  const desync = b.rows.some(
+    (r) => r.annee !== b.annee || r.semaine !== b.semaine || r.distributeurId !== b.distributeurId,
+  );
+  if (!desync) return b;
+  const dist = DISTRIBUTEURS.find((d) => d.id === b.distributeurId);
+  const rows = b.rows.map((r) => ({
+    ...r,
+    annee: b.annee,
+    semaine: b.semaine,
+    distributeurId: b.distributeurId,
+    ...(r.distributeurId !== b.distributeurId && dist
+      ? { magasinCode: `${dist.codeRetail}-CONSO`, magasinLibelle: `${dist.nom} — flux consolidé` }
+      : {}),
+  }));
+  return { ...b, rows };
+}
+
+/** Met à jour les métadonnées d'un lot (local + base en ligne), lignes incluses. */
 export function updateBatch(id: string, patch: Partial<Omit<ImportBatch, 'id' | 'rows'>>): void {
-  cache = cache.map((b) => (b.id === id ? { ...b, ...patch } : b));
+  cache = cache.map((b) => (b.id === id ? syncRowsWithMeta({ ...b, ...patch }) : b));
   writeStore(cache);
   if (serverActive) {
     const updated = cache.find((b) => b.id === id);
@@ -193,6 +264,9 @@ export function updateBatch(id: string, patch: Partial<Omit<ImportBatch, 'id' | 
 export function deleteBatch(id: string): void {
   cache = cache.filter((b) => b.id !== id);
   writeStore(cache);
+  // Hygiène du registre : un id supprimé n'a plus à y figurer.
+  const synced = readSyncedIds();
+  if (synced.delete(id)) writeSyncedIds(synced);
   if (serverActive) void deleteBatchOnServer(id);
 }
 
