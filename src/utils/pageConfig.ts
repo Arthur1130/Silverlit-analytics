@@ -8,10 +8,11 @@ export interface PageFilterConfig {
   distributeur: boolean;
   gamme: boolean;
   devise: boolean;
+  toggles: boolean;     // bascules vs N-1 / HT-TTC (page Vue d'ensemble uniquement)
 }
 
-const ALL: PageFilterConfig = { period: true, distributeur: true, gamme: true, devise: true };
-const NONE: PageFilterConfig = { period: false, distributeur: false, gamme: false, devise: false };
+const ALL: PageFilterConfig = { period: true, distributeur: true, gamme: true, devise: true, toggles: false };
+const NONE: PageFilterConfig = { period: false, distributeur: false, gamme: false, devise: false, toggles: false };
 
 export function filtersForPath(pathname: string): PageFilterConfig {
   // Pages sans filtres globaux : paramètres internes ou statiques
@@ -23,28 +24,30 @@ export function filtersForPath(pathname: string): PageFilterConfig {
   // Page d'un produit précis : pas de filtre gamme (1 seul produit) ni de
   // filtre distributeur (vue produit cross-canal). Période + devise utiles.
   if (pathname.startsWith('/produits/')) {
-    return { period: true, distributeur: false, gamme: false, devise: true };
+    return { period: true, distributeur: false, gamme: false, devise: true, toggles: false };
   }
 
   // Page d'un distributeur précis : pas de filtre distributeur (on est dessus).
   // Période + gamme + devise utiles.
   if (pathname.startsWith('/distributeurs/')) {
-    return { period: true, distributeur: false, gamme: true, devise: true };
+    return { period: true, distributeur: false, gamme: true, devise: true, toggles: false };
   }
 
   // Liste des distributeurs : pas de filtre distributeur (la page est la liste)
   if (pathname === '/distributeurs') {
-    return { period: true, distributeur: false, gamme: true, devise: true };
+    return { period: true, distributeur: false, gamme: true, devise: true, toggles: false };
   }
 
   // Alertes : pas de période (les alertes ont leurs propres timestamps) ni de
   // devise (elles ne portent pas de montants). Distributeur + gamme utiles.
   if (pathname === '/alertes') {
-    return { period: false, distributeur: true, gamme: true, devise: false };
+    return { period: false, distributeur: true, gamme: true, devise: false, toggles: false };
   }
 
-  // Pilotage et liste produits : tous les filtres applicables
-  if (pathname === '/pilotage' || pathname === '/produits') return ALL;
+  // Pilotage (Vue d'ensemble) : tous les filtres + bascules vs N-1 / HT-TTC
+  if (pathname === '/pilotage') return { ...ALL, toggles: true };
+  // Liste produits : tous les filtres, sans les bascules
+  if (pathname === '/produits') return ALL;
 
   return NONE;
 }

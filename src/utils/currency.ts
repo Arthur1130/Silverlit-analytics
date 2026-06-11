@@ -86,12 +86,19 @@ const localeForDevise: Record<Devise, string> = {
   CNY: 'zh-CN',
 };
 
+// TVA standard (jouets, France). Le PVC stocké fait office de TTC ; le HT en est
+// DÉRIVÉ (estimation — aucune TVA réelle n'est fournie par les fichiers sources).
+export const TVA_TAUX = 0.2;
+export function toHT(montantTTC: number, taux = TVA_TAUX): number {
+  return montantTTC / (1 + taux);
+}
+
 export function formatMoney(
   amountEUR: number,
   devise: Devise,
-  opts: { compact?: boolean; decimals?: number } = {},
+  opts: { compact?: boolean; decimals?: number; ht?: boolean } = {},
 ): string {
-  const value = convert(amountEUR, devise);
+  const value = convert(opts.ht ? toHT(amountEUR) : amountEUR, devise);
   const { compact = false, decimals } = opts;
   const fractionDigits =
     decimals !== undefined ? decimals : devise === 'JPY' || devise === 'CNY' ? 0 : 2;

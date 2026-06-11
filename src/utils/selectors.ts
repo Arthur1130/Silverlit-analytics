@@ -6,8 +6,9 @@ import {
   DISTRIBUTEURS,
   findProduit,
 } from '../data';
-import type { Vente } from '../types';
+import type { Vente, Gamme } from '../types';
 import type { AppFilters, Period } from '../context/AppContext';
+import { dateFromWeek } from './format';
 
 export function periodWeeks(period: Period): Array<{ annee: number; semaine: number }> {
   switch (period) {
@@ -287,6 +288,163 @@ export function compareYoY(ventes: Vente[], refWeek?: number): YoYComparison {
     totalQteN, totalQteN1,
     reference,
   };
+}
+
+// =======================================================================
+//   Vue d'ensemble — agrégats N vs N-1 (KPI, mensuel, distributeur, top produits)
+// =======================================================================
+//
+// Périmètre = scopeVentes(filters) (distributeur + gamme, SANS période). On compare
+// l'année N (la plus récente présente) à N-1. Règle anti-faux-chiffre : une évolution
+// n'existe que s'il y a une vraie base N-1 (sinon `null` → l'UI affiche « — »/« Nouveau »).
+
+function deriveAnnees(ventes: Vente[]): { anneeN: number; anneeN1: number } {
+  const anneeN = ventes.length
+    ? ventes.reduce((m, v) => (v.annee > m ? v.annee : m), ventes[0].annee)
+    : CURRENT_WEEK.annee;
+  return { anneeN, anneeN1: anneeN - 1 };
+}
+
+function evolution(valN: number, valN1: number): number | null {
+  return valN1 > 0 ? ((valN - valN1) / valN1) * 100 : null;
+}
+
+export interface KpiYoY { valN: number; valN1: number; evolution: number | null; }
+export interface AggKPIYoY {
+  ca: KpiYoY;
+  qte: KpiYoY;
+  transactions: KpiYoY;        // proxy : nombre de lignes de vente (pas de ticket en data)
+  distributeursActifs: KpiYoY;
+  hasN1: boolean;
+}
+
+export function aggregateKPIYoY(ventes: Vente[]): AggKPIYoY {
+  const { anneeN, anneeN1 } = deriveAnnees(ventes);
+  let caN = 0, caN1 = 0, qteN = 0, qteN1 = 0, txN = 0, txN1 = 0;
+  const distN = new Set<string>();
+  const distN1 = new Set<string>();
+  for (const v of ventes) {
+    if (v.annee === anneeN) { caN += v.caTTC; qteN += v.qteVendue; txN += 1; distN.add(v.distributeurId); }
+    else if (v.annee === anneeN1) { caN1 += v.caTTC; qteN1 += v.qteVendue; txN1 += 1; distN1.add(v.distributeurId); }
+  }
+  const mk = (n: number, n1: number): KpiYoY => ({ valN: n, valN1: n1, evolution: evolution(n, n1) });
+  return {
+    ca: mk(caN, caN1),
+    qte: mk(qteN, qteN1),
+    transactions: mk(txN, txN1),
+    distributeursActifs: mk(distN.size, distN1.size),
+    hasN1: caN1 > 0 || qteN1 > 0 || txN1 > 0,
+  };
+}
+
+export interface MonthYoY {
+  mois: number;                // 1..12
+  caN: number | null; caN1: number | null;
+  qteN: number | null; qteN1: number | null;
+  caEvolution: number | null; qteEvolution: number | null;
+}
+
+export function monthlyYoY(ventes: Vente[]): {
+  anneeN: number; anneeN1: number; hasN1: boolean; months: MonthYoY[];
+} {
+  const { anneeN, anneeN1 } = deriveAnnees(ventes);
+  const aggN = new Map<number, { ca: number; qte: number }>();
+  const aggN1 = new Map<number, { ca: number; qte: number }>();
+  for (const v of ventes) {
+    const target = v.annee === anneeN ? aggN : v.annee === anneeN1 ? aggN1 : null;
+    if (!target) continue;
+    // Mois ancré sur le JEUDI de la semaine ISO (jour qui détermine l'année/mois
+    // d'une semaine) — sinon la S1 (lundi 29 déc.) tomberait en décembre N-1.
+    const jeudi = dateFromWeek(v.annee, v.semaine);
+    jeudi.setDate(jeudi.getDate() + 3);
+    const mois = jeudi.getMonth() + 1;
+    const cur = target.get(mois) ?? { ca: 0, qte: 0 };
+    cur.ca += v.caTTC; cur.qte += v.qteVendue;
+    target.set(mois, cur);
+  }
+  const months: MonthYoY[] = Array.from({ length: 12 }, (_, i) => {
+    const m = i + 1;
+    const n = aggN.get(m);
+    const n1 = aggN1.get(m);
+    return {
+      mois: m,
+      caN: n ? n.ca : null,
+      caN1: n1 ? n1.ca : null,
+      qteN: n ? n.qte : null,
+      qteN1: n1 ? n1.qte : null,
+      caEvolution: n1 ? evolution(n ? n.ca : 0, n1.ca) : null,
+      qteEvolution: n1 ? evolution(n ? n.qte : 0, n1.qte) : null,
+    };
+  });
+  return { anneeN, anneeN1, hasN1: aggN1.size > 0, months };
+}
+
+export interface DistribYoY {
+  id: string; nom: string; color: string;
+  caN: number; caN1: number; evolution: number | null;
+}
+
+export function caByDistributeurYoY(ventes: Vente[]): {
+  anneeN: number; anneeN1: number; rows: DistribYoY[];
+} {
+  const { anneeN, anneeN1 } = deriveAnnees(ventes);
+  const mN = new Map<string, number>();
+  const mN1 = new Map<string, number>();
+  for (const v of ventes) {
+    if (v.annee === anneeN) mN.set(v.distributeurId, (mN.get(v.distributeurId) ?? 0) + v.caTTC);
+    else if (v.annee === anneeN1) mN1.set(v.distributeurId, (mN1.get(v.distributeurId) ?? 0) + v.caTTC);
+  }
+  const rows = DISTRIBUTEURS
+    .map((d) => {
+      const caN = mN.get(d.id) ?? 0;
+      const caN1 = mN1.get(d.id) ?? 0;
+      return { id: d.id, nom: d.nom, color: d.logoColor, caN, caN1, evolution: evolution(caN, caN1) };
+    })
+    .filter((r) => r.caN > 0 || r.caN1 > 0)
+    .sort((a, b) => b.caN - a.caN);
+  return { anneeN, anneeN1, rows };
+}
+
+export interface TopProduitYoY {
+  rang: number; ean: string; libelle: string; refFournisseur: string; gamme: Gamme;
+  valN: number; valN1: number; qteN: number; partPct: number; evolution: number | null; nouveau: boolean;
+}
+
+export function topProduitsYoY(ventes: Vente[], n = 8, metric: 'ca' | 'qte' = 'ca'): {
+  anneeN: number; anneeN1: number; totalN: number; items: TopProduitYoY[];
+} {
+  const { anneeN, anneeN1 } = deriveAnnees(ventes);
+  const mN = new Map<string, { ca: number; qte: number }>();
+  const mN1 = new Map<string, { ca: number; qte: number }>();
+  // Clé = EAN canonique (findProduit gère le zéro de tête) → pas de doublon produit.
+  for (const v of ventes) {
+    const target = v.annee === anneeN ? mN : v.annee === anneeN1 ? mN1 : null;
+    if (!target) continue;
+    const key = findProduit(v.ean)?.ean ?? v.ean;
+    const cur = target.get(key) ?? { ca: 0, qte: 0 };
+    cur.ca += v.caTTC; cur.qte += v.qteVendue;
+    target.set(key, cur);
+  }
+  const pick = (x: { ca: number; qte: number }) => (metric === 'ca' ? x.ca : x.qte);
+  let totalN = 0;
+  for (const x of mN.values()) totalN += pick(x);
+  const raw: Array<Omit<TopProduitYoY, 'rang' | 'partPct'>> = [];
+  for (const [ean, n0] of mN.entries()) {
+    const produit = findProduit(ean);
+    if (!produit) continue;
+    const n1 = mN1.get(ean) ?? { ca: 0, qte: 0 };
+    const valN = pick(n0);
+    const valN1 = pick(n1);
+    raw.push({
+      ean: produit.ean, libelle: produit.libelle, refFournisseur: produit.refFournisseur,
+      gamme: produit.gamme, valN, valN1, qteN: n0.qte, evolution: evolution(valN, valN1), nouveau: valN1 === 0,
+    });
+  }
+  raw.sort((a, b) => b.valN - a.valN);
+  const items: TopProduitYoY[] = raw.slice(0, n).map((r, i) => ({
+    ...r, rang: i + 1, partPct: totalN > 0 ? (r.valN / totalN) * 100 : 0,
+  }));
+  return { anneeN, anneeN1, totalN, items };
 }
 
 export function ventesByEan(ean: string) {

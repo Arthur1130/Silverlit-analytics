@@ -16,7 +16,13 @@ export interface AppFilters {
   period: Period;
   distributeurId: string | 'all';
   gamme: Gamme | 'all';
+  vsN1: boolean;              // bascule « vs N-1 » (page Vue d'ensemble)
+  priceMode: 'HT' | 'TTC';    // bascule HT / TTC
 }
+
+const DEFAULT_FILTERS: AppFilters = {
+  period: '13S', distributeurId: 'all', gamme: 'all', vsN1: true, priceMode: 'TTC',
+};
 
 interface AppContextValue {
   devise: Devise;
@@ -99,9 +105,12 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const initialRates = useMemo(loadRates, []);
 
   const [devise, setDevise] = useState<Devise>(initial.devise ?? 'EUR');
-  const [filters, setFilters] = useState<AppFilters>(
-    initial.filters ?? { period: '13S', distributeurId: 'all', gamme: 'all' },
-  );
+  // Fusion avec les défauts : les anciennes prefs persistées peuvent ne pas avoir
+  // vsN1/priceMode → on garantit des valeurs définies (sinon la bascule casse).
+  const [filters, setFilters] = useState<AppFilters>({
+    ...DEFAULT_FILTERS,
+    ...(initial.filters ?? {}),
+  });
   const [dark, setDark] = useState<boolean>(initial.dark ?? false);
   const [alertes, setAlertes] = useState<Alerte[]>(initAlertes);
   const [exchangeRates, setExchangeRatesState] = useState<Record<Devise, number>>(initialRates);

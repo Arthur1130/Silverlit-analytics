@@ -45,3 +45,8 @@ export function shortDistribName(nom: string, max = 22): string {
 export function truncate(s: string, max = 30): string {
   return s.length > max ? s.slice(0, max - 1) + '…' : s;
 }
+
+const MOIS_COURTS = ['Janv.', 'Févr.', 'Mars', 'Avr.', 'Mai', 'Juin', 'Juil.', 'Août', 'Sept.', 'Oct.', 'Nov.', 'Déc.'];
+export function monthShort(mois: number): string {
+  return MOIS_COURTS[mois - 1] ?? '';
+}

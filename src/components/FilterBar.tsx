@@ -7,6 +7,7 @@ import { DEVISE_LIST, getExchangeRate } from '../utils/currency';
 import { DISTRIBUTEURS } from '../data';
 import { classNames } from '../utils/format';
 import { filtersForPath, hasAnyFilter } from '../utils/pageConfig';
+import { Segmented } from './ui';
 
 const PERIODS: Array<{ value: Period; label: string }> = [
   { value: 'S-1', label: 'Semaine S-1' },
@@ -133,13 +134,15 @@ export function FilterBar() {
   const hasDirty =
     (cfg.period && filters.period !== '13S') ||
     (cfg.distributeur && filters.distributeurId !== 'all') ||
-    (cfg.gamme && filters.gamme !== 'all');
+    (cfg.gamme && filters.gamme !== 'all') ||
+    (cfg.toggles && (!filters.vsN1 || filters.priceMode !== 'TTC'));
 
   function reset() {
     const next = { ...filters };
     if (cfg.period) next.period = '13S';
     if (cfg.distributeur) next.distributeurId = 'all';
     if (cfg.gamme) next.gamme = 'all';
+    if (cfg.toggles) { next.vsN1 = true; next.priceMode = 'TTC'; }
     setFilters(next);
   }
 
@@ -170,6 +173,20 @@ export function FilterBar() {
             options={GAMMES}
             onChange={(v) => setFilters({ ...filters, gamme: v as Gamme | 'all' })}
           />
+        )}
+        {cfg.toggles && (
+          <>
+            <Segmented<'on' | 'off'>
+              value={filters.vsN1 ? 'on' : 'off'}
+              options={[{ value: 'on', label: 'vs N-1' }, { value: 'off', label: 'N seul' }]}
+              onChange={(v) => setFilters({ ...filters, vsN1: v === 'on' })}
+            />
+            <Segmented<'HT' | 'TTC'>
+              value={filters.priceMode}
+              options={[{ value: 'TTC', label: 'TTC' }, { value: 'HT', label: 'HT' }]}
+              onChange={(v) => setFilters({ ...filters, priceMode: v })}
+            />
+          </>
         )}
         {cfg.devise && (
           <Dropdown
