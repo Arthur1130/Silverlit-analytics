@@ -22,3 +22,11 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Variables d'environnement (secrets) — ne jamais committer
+.env
+.env.*
+!.env.example
+
+# Scratch local (scripts de workflow, etc.)
+.claude/

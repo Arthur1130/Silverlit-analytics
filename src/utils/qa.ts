@@ -275,16 +275,21 @@ function topDistribs(ventes: Vente[], n: number) {
     .map(([id, agg]) => ({ id, nom: findDistributeur(id)?.nom ?? id, ...agg }));
 }
 
-function previousPeriod(p: PeriodFilter): PeriodFilter {
+// Période précédente comparable, ou null s'il n'existe pas d'historique
+// antérieur — pour ne JAMAIS inventer un « 0 % » ou « +100 % vs précédent »
+// quand il n'y a rien à comparer (même règle anti-faux-chiffre que le dashboard).
+function previousPeriod(p: PeriodFilter): PeriodFilter | null {
   const len = p.weeks.length;
   const idxStart = WEEKS.findIndex((w) => w.annee === p.weeks[0].annee && w.semaine === p.weeks[0].semaine);
-  if (idxStart <= 0) return p;
+  if (idxStart <= 0) return null;
   return { label: 'précédente', weeks: WEEKS.slice(Math.max(0, idxStart - len), idxStart) };
 }
 
 function growthsByProduct(period: PeriodFilter, distIds?: string[], gamme?: Gamme | null) {
+  const prevPeriod = previousPeriod(period);
+  if (!prevPeriod) return [];  // pas d'antériorité → aucune croissance à calculer
   const cur = filterVentes(period, distIds, gamme);
-  const prev = filterVentes(previousPeriod(period), distIds, gamme);
+  const prev = filterVentes(prevPeriod, distIds, gamme);
   const curM = new Map<string, number>();
   const prevM = new Map<string, number>();
   for (const v of cur) curM.set(v.ean, (curM.get(v.ean) ?? 0) + v.caTTC);
@@ -295,7 +300,8 @@ function growthsByProduct(period: PeriodFilter, distIds?: string[], gamme?: Gamm
     const caCur = curM.get(e) ?? 0;
     const caPrev = prevM.get(e) ?? 0;
     if (caCur + caPrev < 50) continue;
-    const pct = caPrev > 0 ? ((caCur - caPrev) / caPrev) * 100 : caCur > 0 ? 100 : 0;
+    if (caPrev <= 0) continue;  // produit sans antériorité réelle → pas de % de croissance inventé
+    const pct = ((caCur - caPrev) / caPrev) * 100;
     out.push({ ean: e, libelle: findProduit(e)?.libelle ?? e, caCur, caPrev, pct });
   }
   return out;
@@ -551,12 +557,12 @@ function answerDistributeurInfo(distId: string, period: PeriodFilter, gamme: Gam
   const d = findDistributeur(distId)!;
   const v = filterVentes(period, [distId], gamme);
   const t = totals(v);
-  const prev = filterVentes(previousPeriod(period), [distId], gamme);
-  const tPrev = totals(prev);
-  const delta = tPrev.ca > 0 ? ((t.ca - tPrev.ca) / tPrev.ca) * 100 : 0;
+  const prevPeriod = previousPeriod(period);
+  const tPrev = totals(prevPeriod ? filterVentes(prevPeriod, [distId], gamme) : []);
+  const delta = prevPeriod && tPrev.ca > 0 ? ((t.ca - tPrev.ca) / tPrev.ca) * 100 : null;
   const top = topProducts(v, 3);
   return {
-    text: `**${d.nom}** sur ${period.label}${gamme ? ` (${gamme})` : ''} : ${fmtEUR(t.ca)} de CA (${fmtPct(delta)} vs précédent), ${fmtNum(t.qte)} u., ${t.refs} réfs.`,
+    text: `**${d.nom}** sur ${period.label}${gamme ? ` (${gamme})` : ''} : ${fmtEUR(t.ca)} de CA${delta !== null ? ` (${fmtPct(delta)} vs précédent)` : ''}, ${fmtNum(t.qte)} u., ${t.refs} réfs.`,
     bullets: top.map((p, i) => `${i + 1}. ${p.libelle} — ${fmtEUR(p.ca)} · ${fmtNum(p.qte)} u.`),
     link: { label: `Ouvrir ${d.nom}`, to: `/distributeurs/${d.id}` },
     followUps: [`Top produits ${d.nom}`, `Qualité source ${d.nom}`],
@@ -576,12 +582,18 @@ function answerGovernance(distIds: string[]): QAAnswer {
       };
     }
   }
-  const moy = SOURCES.reduce((s, x) => s + x.scoreQualite, 0) / SOURCES.length;
+  // Moyenne sur les sources ACTIVES uniquement (au moins une semaine reçue),
+  // comme la page Gouvernance — sinon les sources sans données écrasent le
+  // score et le chatbot contredit l'écran (44 vs 87).
+  const actives = SOURCES.filter((s) => s.semainesRecues > 0);
+  const moy = actives.length > 0
+    ? actives.reduce((s, x) => s + x.scoreQualite, 0) / actives.length
+    : 0;
   const enRetard = SOURCES
     .filter((s) => s.semainesRecues < s.semainesAttendues)
     .sort((a, b) => (a.semainesRecues / a.semainesAttendues) - (b.semainesRecues / b.semainesAttendues));
   return {
-    text: `Score qualité moyen ${moy.toFixed(0)}/100 sur ${SOURCES.length} sources. ${enRetard.length} en retard.`,
+    text: `Score qualité moyen ${moy.toFixed(0)}/100 sur ${actives.length} source${actives.length > 1 ? 's' : ''} active${actives.length > 1 ? 's' : ''}. ${enRetard.length} en retard.`,
     bullets: enRetard.slice(0, 5).map((s) => {
       const d = findDistributeur(s.distributeurId);
       return `${d?.nom} — ${s.semainesRecues}/${s.semainesAttendues} sem. (score ${s.scoreQualite})`;
@@ -592,16 +604,17 @@ function answerGovernance(distIds: string[]): QAAnswer {
 
 function answerSales(period: PeriodFilter, distIds: string[], gamme: Gamme | null): QAAnswer {
   const v = filterVentes(period, distIds.length ? distIds : undefined, gamme);
-  const prev = filterVentes(previousPeriod(period), distIds.length ? distIds : undefined, gamme);
+  const prevPeriod = previousPeriod(period);
+  const prev = prevPeriod ? filterVentes(prevPeriod, distIds.length ? distIds : undefined, gamme) : [];
   const t = totals(v);
   const tPrev = totals(prev);
-  const dCa = tPrev.ca > 0 ? ((t.ca - tPrev.ca) / tPrev.ca) * 100 : 0;
-  const dQte = tPrev.qte > 0 ? ((t.qte - tPrev.qte) / tPrev.qte) * 100 : 0;
+  const dCa = prevPeriod && tPrev.ca > 0 ? ((t.ca - tPrev.ca) / tPrev.ca) * 100 : null;
+  const dQte = prevPeriod && tPrev.qte > 0 ? ((t.qte - tPrev.qte) / tPrev.qte) * 100 : null;
   const ctx = distIds.length === 1
     ? `chez ${findDistributeur(distIds[0])?.nom}`
     : distIds.length > 1 ? `pour ${distIds.length} enseignes` : '';
   return {
-    text: `Sur ${period.label}${ctx ? ` ${ctx}` : ''}${gamme ? ` · ${gamme}` : ''} : ${fmtEUR(t.ca)} de CA (${fmtPct(dCa)} vs précédent), ${fmtNum(t.qte)} u. (${fmtPct(dQte)}), ${t.refs} réfs.`,
+    text: `Sur ${period.label}${ctx ? ` ${ctx}` : ''}${gamme ? ` · ${gamme}` : ''} : ${fmtEUR(t.ca)} de CA${dCa !== null ? ` (${fmtPct(dCa)} vs précédent)` : ''}, ${fmtNum(t.qte)} u.${dQte !== null ? ` (${fmtPct(dQte)})` : ''}, ${t.refs} réfs.`,
     link: { label: 'Voir le pilotage', to: '/pilotage' },
     amountsAreEUR: true,
   };

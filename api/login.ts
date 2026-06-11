@@ -42,7 +42,10 @@ export default async function handler(req: any, res: any) {
       role: u.role, lastLogin: new Date().toISOString(), createdAt: u.created_at,
     });
   } catch (e) {
-    // Si la base n'est pas joignable, on renvoie 401 (le front gère le filet de secours)
-    return res.status(401).json({ error: 'Identifiants invalides', detail: String((e as Error)?.message ?? e) });
+    // Si la base n'est pas joignable, on renvoie 401 (le front gère le filet de secours).
+    // On NE renvoie PAS le détail de l'exception au navigateur (fuite d'infos internes) :
+    // on le journalise uniquement côté serveur.
+    console.error('[login] erreur serveur :', e);
+    return res.status(401).json({ error: 'Identifiants invalides' });
   }
 }

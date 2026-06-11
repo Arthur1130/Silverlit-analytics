@@ -138,8 +138,11 @@ export function Infographie() {
       .slice(0, 5);
   }, [cur, prev, selectedDist]);
 
-  // Mouvements : top 3 hausses + top 3 baisses (par produit)
+  // Mouvements : top 3 hausses + top 3 baisses (par produit).
+  // Pas de période de comparaison réelle → aucun mouvement (jamais de
+  // « +100 % » inventé pour un produit sans antériorité sur le poster).
   const mouvements = useMemo(() => {
+    if (!hasComparison) return { hausses: [], baisses: [] };
     const cMap = new Map<string, number>();
     const pMap = new Map<string, number>();
     for (const v of cur) cMap.set(v.ean, (cMap.get(v.ean) ?? 0) + v.caTTC);
@@ -150,13 +153,14 @@ export function Infographie() {
       const caCur = cMap.get(e) ?? 0;
       const caPrev = pMap.get(e) ?? 0;
       if (caCur + caPrev < 200) continue;
-      const pct = caPrev > 0 ? ((caCur - caPrev) / caPrev) * 100 : caCur > 0 ? 100 : 0;
+      if (caPrev <= 0) continue;  // produit sans antériorité → exclu (pas de % inventé)
+      const pct = ((caCur - caPrev) / caPrev) * 100;
       arr.push({ ean: e, libelle: findProduit(e)?.libelle ?? e, caCur, caPrev, pct });
     }
     const hausses = [...arr].sort((a, b) => b.pct - a.pct).slice(0, 3);
     const baisses = [...arr].sort((a, b) => a.pct - b.pct).slice(0, 3);
     return { hausses, baisses };
-  }, [cur, prev]);
+  }, [cur, prev, hasComparison]);
 
   // Mini-courbe CA hebdomadaire
   const sparkData = useMemo(() => {

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { Search, ArrowUpDown } from 'lucide-react';
 import { useApp } from '../context/AppContext';
 import { Card, Badge } from '../components/ui';
-import { PRODUITS } from '../data';
+import { PRODUITS, findProduit } from '../data';
 import { filteredVentes } from '../utils/selectors';
 import { formatMoney, formatNumber } from '../utils/currency';
 import { classNames } from '../utils/format';
@@ -25,11 +25,16 @@ export function Produits() {
   const enriched = useMemo(() => {
     const stats = new Map<string, { ca: number; qte: number; stock: number }>();
     for (const v of ventes) {
-      const s = stats.get(v.ean) ?? { ca: 0, qte: 0, stock: 0 };
+      // Clé = EAN canonique du catalogue : les fichiers sources stockent parfois
+      // l'EAN avec un zéro de tête ("0730002030513") absent du catalogue
+      // ("730002030513"). Sans normalisation, les ventes ne s'apparient jamais
+      // au produit et il s'affiche à 0 alors qu'il s'est vendu.
+      const key = findProduit(v.ean)?.ean ?? v.ean;
+      const s = stats.get(key) ?? { ca: 0, qte: 0, stock: 0 };
       s.ca += v.caTTC;
       s.qte += v.qteVendue;
       s.stock = Math.max(s.stock, v.qteStock);
-      stats.set(v.ean, s);
+      stats.set(key, s);
     }
     return PRODUITS.map((p) => ({
       ...p,

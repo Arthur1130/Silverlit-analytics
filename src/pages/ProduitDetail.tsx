@@ -25,8 +25,14 @@ export function ProduitDetail() {
   const { devise, alertes, filters } = useApp();
   const produit = findProduit(ean);
 
-  // Historique complet : utilisé pour le graphique 24 mois (contexte)
-  const ventesAll = useMemo(() => VENTES.filter((v) => v.ean === ean), [ean]);
+  // Historique complet : utilisé pour le graphique 24 mois (contexte).
+  // Appariement via l'EAN CANONIQUE (findProduit gère le zéro de tête des
+  // fichiers sources) — sinon "0730002030513" (vente) ≠ "730002030513"
+  // (catalogue/URL) et la fiche s'affiche à 0 alors que le produit s'est vendu.
+  const ventesAll = useMemo(() => {
+    const cible = findProduit(ean)?.ean ?? ean;
+    return VENTES.filter((v) => (findProduit(v.ean)?.ean ?? v.ean) === cible);
+  }, [ean]);
   const weekSerie = useMemo(() => caByWeek(ventesAll), [ventesAll]);
 
   // Ventes sur la période sélectionnée (filtre global)
