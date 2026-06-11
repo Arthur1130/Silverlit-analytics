@@ -37,4 +37,3 @@ export const WEEKS = buildWeeks();
 
 // Dernière semaine disponible = la plus récente présente dans les données.
 export const CURRENT_WEEK = WEEKS[WEEKS.length - 1];
-export const PREVIOUS_WEEK = WEEKS.length > 1 ? WEEKS[WEEKS.length - 2] : WEEKS[0];

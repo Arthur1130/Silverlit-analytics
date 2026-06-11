@@ -1,5 +1,4 @@
 import type { Distributeur, Magasin } from '../types';
-import { PRODUITS } from './products';
 
 // Référentiel des 11 distributeurs réels Silverlit France (source : organisation
 // des dossiers "STATS 2026" reçus chaque semaine par enseigne)
@@ -21,28 +20,8 @@ export const findDistributeur = (id: string) => DISTRIBUTEURS.find((d) => d.id =
 
 export const isEcommerce = (d: Distributeur) => d.type === 'ecommerce';
 
-// --- Assortiment par distributeur --------------------------------------
-// Chaque enseigne ne référence qu'un SOUS-ENSEMBLE du catalogue Silverlit.
-// - GMS (hyper) : assortiment court, centré sur les best-sellers
-// - GSS (spécialiste) : assortiment large
-// - E-commerce : longue traîne, presque tout le catalogue
-// L'assortiment est déterministe (seed = id enseigne) pour rester stable
-// entre les rechargements.
-
-const ASSORTMENT_SIZE: Record<string, number> = {
-  joueclub: 96,
-  recreaclub: 88,
-  kingjouet: 90,
-  oxybul: 54,
-  fnacdarty: 62,
-  smythstoys: 70,
-  galec: 30,
-  carrefour: 34,
-  auchan: 27,
-  amazon: 102,
-  cdiscount: 79,
-};
-
+// Générateur pseudo-aléatoire déterministe (seed = id enseigne) — sert
+// uniquement à positionner l'échantillon de magasins sur la carte.
 function hashSeed(s: string): number {
   let h = 2166136261;
   for (let i = 0; i < s.length; i++) {
@@ -60,28 +39,6 @@ function mulberry32(a: number) {
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
 }
-
-function buildAssortment(distId: string, size: number): string[] {
-  const rnd = mulberry32(hashSeed(distId));
-  // Score : popularité (index bas = best-seller) + bruit propre à l'enseigne.
-  // Les produits "retiré" ne sont jamais référencés.
-  const scored = PRODUITS
-    .map((p, i) => ({
-      ean: p.ean,
-      statut: p.statut,
-      score: (1 / Math.pow(i + 1, 0.4)) * (0.45 + rnd() * 1.1),
-    }))
-    .filter((x) => x.statut !== 'retire');
-  scored.sort((a, b) => b.score - a.score);
-  return scored.slice(0, Math.min(size, scored.length)).map((s) => s.ean);
-}
-
-export const ASSORTMENTS: Record<string, string[]> = Object.fromEntries(
-  DISTRIBUTEURS.map((d) => [d.id, buildAssortment(d.id, ASSORTMENT_SIZE[d.id] ?? 60)]),
-);
-
-export const assortmentOf = (id: string): string[] => ASSORTMENTS[id] ?? [];
-export const assortmentSize = (id: string): number => (ASSORTMENTS[id] ?? []).length;
 
 // --- Magasins (échantillon représentatif pour la carte) ----------------
 // On ne stocke pas les 3 500 magasins réels : la carte affiche un échantillon
@@ -172,64 +129,6 @@ export const magasinsByDistributeur = (id: string) =>
 /** Lookup d'un magasin par son code (ex : "JC042"). */
 export const findMagasin = (code: string) =>
   MAGASINS.find((m) => m.code === code);
-
-// =======================================================================
-//   Pondération magasin → réseau
-// =======================================================================
-//
-// On ne génère qu'un échantillon de magasins (8-24 par enseigne) alors que
-// les enseignes en ont jusqu'à 1 054 réels (Carrefour). Pour que les
-// chiffres affichés par magasin soient plausibles, il faut deux mécaniques :
-//
-//   1. Une `weight` propre à chaque magasin (variance autour de la moyenne)
-//      → pour qu'un magasin de centre-ville pèse plus qu'une petite ville.
-//      Hash FNV-1a sur le code complet : déterministe ET diversifiant
-//      (l'ancienne formule `charCodeAt(0)+charCodeAt(2)` était dégénérée
-//      pour les codes uniformes type JC001/JC002/…).
-//
-//   2. Une `realShare` qui normalise au parc RÉEL de l'enseigne.
-//      Un magasin "moyen" pèse 1/nbMagasins du CA enseigne ; un magasin
-//      au poids relatif 1.5 pèse 1.5 × (1/nbMagasins).
-//      → évite que JC NICE (1 magasin sur 11 échantillonnés) soit affiché
-//        comme 12% du CA JouéClub alors qu'en réalité il est 1/239 = 0.4%.
-
-function fnv1a(s: string): number {
-  let h = 2166136261 >>> 0;
-  for (let i = 0; i < s.length; i++) {
-    h ^= s.charCodeAt(i);
-    h = Math.imul(h, 16777619) >>> 0;
-  }
-  return h;
-}
-
-/** Poids relatif d'un magasin autour de la moyenne (0.5x à 2x). */
-export function magasinRelativeWeight(code: string, indexInDist: number): number {
-  const seed = ((fnv1a(code) ^ (indexInDist * 17)) >>> 0) % 100;
-  return 0.5 + (seed / 100) * 1.5;
-}
-
-/**
- * Part RÉELLE de ce magasin dans le CA total du distributeur, ajustée au
- * parc réel (nbMagasins). Permet d'afficher des chiffres par magasin
- * comparables à la réalité même si l'app n'a qu'un échantillon.
- */
-export function magasinRealShare(magasin: Magasin, distributeur: Distributeur): number {
-  if (distributeur.nbMagasins <= 0) return 0;
-  if (isEcommerce(distributeur)) return 1; // une seule plateforme = 100%
-  const sampled = magasinsByDistributeur(distributeur.id);
-  const idx = sampled.findIndex((m) => m.code === magasin.code);
-  if (idx < 0) return 0;
-  // poids relatif de ce magasin
-  const relW = magasinRelativeWeight(magasin.code, idx);
-  // poids moyen de l'échantillon
-  const meanW = sampled.reduce(
-    (s, m, i) => s + magasinRelativeWeight(m.code, i),
-    0,
-  ) / Math.max(1, sampled.length);
-  // facteur ≥ 0 autour de la moyenne, ramené sur le parc réel
-  const factor = relW / meanW;
-  return factor / distributeur.nbMagasins;
-}
 
 // Parc total réel (somme des nbMagasins, hors plateformes e-commerce)
 export const TOTAL_POINTS_VENTE = DISTRIBUTEURS
